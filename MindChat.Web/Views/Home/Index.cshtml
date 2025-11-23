@@ -1,0 +1,14 @@
+﻿@{
+    ViewData["Title"] = "Test DB Connection";
+}
+
+<h2>Test DB Connection</h2>
+
+@if (ViewBag.Error != null)
+{
+    <p style="color:red">Error conectando a la base de datos: @ViewBag.Error</p>
+}
+else
+{
+    <p>Conexión exitosa! Número de pacientes en la base: @ViewBag.PatientCount</p>
+}
