@@ -52,75 +52,6 @@ namespace MindChat.Infrastructure.Migrations
                     b.ToTable("Roles", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ClaimType")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ClaimValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("RoleId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RoleId");
-
-                    b.ToTable("RoleClaims", (string)null);
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ClaimType")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ClaimValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserClaims", (string)null);
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
-                {
-                    b.Property<string>("LoginProvider")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("ProviderKey")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("ProviderDisplayName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("LoginProvider", "ProviderKey");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserLogins", (string)null);
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
                 {
                     b.Property<int>("UserId")
@@ -134,25 +65,6 @@ namespace MindChat.Infrastructure.Migrations
                     b.HasIndex("RoleId");
 
                     b.ToTable("UserRoles", (string)null);
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
-                {
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("LoginProvider")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("Value")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("UserId", "LoginProvider", "Name");
-
-                    b.ToTable("UserTokens", (string)null);
                 });
 
             modelBuilder.Entity("MindChat.Domain.Entities.ApplicationUser", b =>
@@ -205,6 +117,10 @@ namespace MindChat.Infrastructure.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("ProfilePictureUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
@@ -255,7 +171,7 @@ namespace MindChat.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PatientId");
+                    b.HasIndex("PatientId", "ScheduledAt");
 
                     b.HasIndex("PsychologistId", "ScheduledAt");
 
@@ -309,9 +225,9 @@ namespace MindChat.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ChatId");
-
                     b.HasIndex("SenderUserId");
+
+                    b.HasIndex("ChatId", "SentAt");
 
                     b.ToTable("ChatMessages");
                 });
@@ -323,6 +239,11 @@ namespace MindChat.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("EmotionalState")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -343,8 +264,28 @@ namespace MindChat.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("IsProfilePrivate")
+                    b.Property<string>("Bio")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("GraduationYear")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsProfileVisible")
                         .HasColumnType("bit");
+
+                    b.Property<bool?>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ProfessionalLicense")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("University")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -355,6 +296,32 @@ namespace MindChat.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Psychologists");
+                });
+
+            modelBuilder.Entity("MindChat.Domain.Entities.PsychologistContact", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ContactPsychologistId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OwnerId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContactPsychologistId");
+
+                    b.HasIndex("OwnerId");
+
+                    b.ToTable("PsychologistContacts");
                 });
 
             modelBuilder.Entity("MindChat.Domain.Entities.PsychologistTag", b =>
@@ -380,27 +347,25 @@ namespace MindChat.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AssignedPsychologistId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("InitialMessage")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("PatientId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("PsychologistId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ReferredPsychologistId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
+                    b.Property<int>("Status")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssignedPsychologistId");
+
                     b.HasIndex("PatientId");
-
-                    b.HasIndex("PsychologistId");
-
-                    b.HasIndex("ReferredPsychologistId");
 
                     b.ToTable("SessionRequests");
                 });
@@ -426,33 +391,6 @@ namespace MindChat.Infrastructure.Migrations
                     b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
-                {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<int>", null)
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
-                {
-                    b.HasOne("MindChat.Domain.Entities.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
-                {
-                    b.HasOne("MindChat.Domain.Entities.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<int>", null)
@@ -461,15 +399,6 @@ namespace MindChat.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("MindChat.Domain.Entities.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
-                {
                     b.HasOne("MindChat.Domain.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -548,6 +477,25 @@ namespace MindChat.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MindChat.Domain.Entities.PsychologistContact", b =>
+                {
+                    b.HasOne("MindChat.Domain.Entities.Psychologist", "ContactPsychologist")
+                        .WithMany()
+                        .HasForeignKey("ContactPsychologistId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MindChat.Domain.Entities.Psychologist", "Owner")
+                        .WithMany("Contacts")
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ContactPsychologist");
+
+                    b.Navigation("Owner");
+                });
+
             modelBuilder.Entity("MindChat.Domain.Entities.PsychologistTag", b =>
                 {
                     b.HasOne("MindChat.Domain.Entities.Psychologist", "Psychologist")
@@ -569,27 +517,20 @@ namespace MindChat.Infrastructure.Migrations
 
             modelBuilder.Entity("MindChat.Domain.Entities.SessionRequest", b =>
                 {
+                    b.HasOne("MindChat.Domain.Entities.Psychologist", "AssignedPsychologist")
+                        .WithMany("SessionRequests")
+                        .HasForeignKey("AssignedPsychologistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MindChat.Domain.Entities.Patient", "Patient")
                         .WithMany("SessionRequests")
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("MindChat.Domain.Entities.Psychologist", "Psychologist")
-                        .WithMany("SessionRequests")
-                        .HasForeignKey("PsychologistId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("MindChat.Domain.Entities.Psychologist", "ReferredPsychologist")
-                        .WithMany()
-                        .HasForeignKey("ReferredPsychologistId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                    b.Navigation("AssignedPsychologist");
 
                     b.Navigation("Patient");
-
-                    b.Navigation("Psychologist");
-
-                    b.Navigation("ReferredPsychologist");
                 });
 
             modelBuilder.Entity("MindChat.Domain.Entities.ApplicationUser", b =>
@@ -616,6 +557,8 @@ namespace MindChat.Infrastructure.Migrations
             modelBuilder.Entity("MindChat.Domain.Entities.Psychologist", b =>
                 {
                     b.Navigation("Appointments");
+
+                    b.Navigation("Contacts");
 
                     b.Navigation("PsychologistTags");
 

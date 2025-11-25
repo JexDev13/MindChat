@@ -1,8 +1,10 @@
+using DotNetEnv;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MindChat.Domain.Entities;
 using MindChat.Infrastructure.Data;
-using DotNetEnv;
+using MindChat.Infrastructure.Seed;
 var builder = WebApplication.CreateBuilder(args);
 
 Env.Load();
@@ -15,11 +17,10 @@ var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
 var connectionString =
     $"Server={dbServer};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=False;";
 
+var infraAssembly = typeof(ApplicationDbContext).Assembly.FullName;
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(
-        connectionString,
-        b => b.MigrationsAssembly("MindChat.Infrastructure")
-    )
+    options.UseSqlServer(connectionString, b => b.MigrationsAssembly(infraAssembly))
 );
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<int>>(options =>
@@ -65,21 +66,21 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole<int>>>();
-
+        var logger = services.GetRequiredService<ILogger<Program>>();
         context.Database.Migrate();
-
-        await SeedRoles(roleManager);
-
+        await IdentitySeeder.SeedCoreAsync(roleManager);
+        await TagSeeder.SeedTagAsync(context, logger);
+        logger.LogInformation("Migración y seeding completados exitosamente.");
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Ocurrió un error durante la migración o seed de datos.");
+        logger.LogError(ex, "Ocurrió un error durante la migración o el seeding.");
     }
 }
 
@@ -108,16 +109,3 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 app.Run();
-
-static async Task SeedRoles(RoleManager<IdentityRole<int>> roleManager)
-{
-    string[] roleNames = { "Psychologist", "Patient" };
-
-    foreach (var roleName in roleNames)
-    {
-        if (!await roleManager.RoleExistsAsync(roleName))
-        {
-            await roleManager.CreateAsync(new IdentityRole<int>(roleName));
-        }
-    }
-}

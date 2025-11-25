@@ -20,11 +20,13 @@ namespace MindChat.Infrastructure.Data
         public DbSet<Chat> Chats { get; set; }
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
+        public DbSet<PsychologistContact> PsychologistContacts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            // Configuración de ApplicationUser
             modelBuilder.Entity<ApplicationUser>(entity =>
             {
                 entity.Property(e => e.FullName)
@@ -42,12 +44,16 @@ namespace MindChat.Infrastructure.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // Configuración de Patient
             modelBuilder.Entity<Patient>(entity =>
             {
                 entity.HasKey(e => e.Id);
 
                 entity.HasIndex(e => e.UserId)
                     .IsUnique();
+
+                entity.Property(e => e.EmotionalState)
+                    .HasMaxLength(50);
 
                 entity.HasMany(e => e.SessionRequests)
                     .WithOne(sr => sr.Patient)
@@ -60,6 +66,7 @@ namespace MindChat.Infrastructure.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // Configuración de Psychologist
             modelBuilder.Entity<Psychologist>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -67,17 +74,33 @@ namespace MindChat.Infrastructure.Data
                 entity.HasIndex(e => e.UserId)
                     .IsUnique();
 
+                entity.Property(e => e.ProfessionalLicense)
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.University)
+                    .HasMaxLength(200);
+
+                entity.Property(e => e.Bio)
+                    .HasMaxLength(2000);
+
                 entity.HasMany(e => e.Appointments)
                     .WithOne(a => a.Psychologist)
                     .HasForeignKey(a => a.PsychologistId)
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasMany(e => e.SessionRequests)
-                    .WithOne(sr => sr.Psychologist)
-                    .HasForeignKey(sr => sr.PsychologistId)
+                    .WithOne(sr => sr.AssignedPsychologist)
+                    .HasForeignKey(sr => sr.AssignedPsychologistId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasMany(e => e.Contacts)
+                    .WithOne(c => c.Owner)
+                    .HasForeignKey(c => c.OwnerId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
+
+            // Configuración de PsychologistTag (tabla intermedia)
             modelBuilder.Entity<PsychologistTag>(entity =>
             {
                 entity.HasKey(pt => new { pt.PsychologistId, pt.TagId });
@@ -93,6 +116,7 @@ namespace MindChat.Infrastructure.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // Configuración de Tag
             modelBuilder.Entity<Tag>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -105,6 +129,7 @@ namespace MindChat.Infrastructure.Data
                     .IsUnique();
             });
 
+            // Configuración de SessionRequest
             modelBuilder.Entity<SessionRequest>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -113,20 +138,43 @@ namespace MindChat.Infrastructure.Data
                     .IsRequired()
                     .HasMaxLength(50);
 
-                entity.HasOne(sr => sr.ReferredPsychologist)
-                    .WithMany()
-                    .HasForeignKey(sr => sr.ReferredPsychologistId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                entity.Property(e => e.InitialMessage)
+                    .IsRequired();
 
                 entity.HasOne(e => e.Chat)
                     .WithOne(c => c.SessionRequest)
                     .HasForeignKey<Chat>(c => c.SessionRequestId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.AssignedPsychologist)
+                    .WithMany(p => p.SessionRequests)
+                    .HasForeignKey(e => e.AssignedPsychologistId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // Configuración de PsychologistContact
+            modelBuilder.Entity<PsychologistContact>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(pc => pc.Owner)
+                    .WithMany(p => p.Contacts)
+                    .HasForeignKey(pc => pc.OwnerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(pc => pc.ContactPsychologist)
+                    .WithMany()
+                    .HasForeignKey(pc => pc.ContactPsychologistId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configuración de Chat
             modelBuilder.Entity<Chat>(entity =>
             {
                 entity.HasKey(e => e.Id);
+
+                entity.HasIndex(e => e.SessionRequestId)
+                    .IsUnique();
 
                 entity.HasMany(e => e.Messages)
                     .WithOne(m => m.Chat)
@@ -134,6 +182,7 @@ namespace MindChat.Infrastructure.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // Configuración de ChatMessage
             modelBuilder.Entity<ChatMessage>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -148,8 +197,11 @@ namespace MindChat.Infrastructure.Data
                     .WithMany()
                     .HasForeignKey(e => e.SenderUserId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(e => new { e.ChatId, e.SentAt });
             });
 
+            // Configuración de Appointment
             modelBuilder.Entity<Appointment>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -161,15 +213,17 @@ namespace MindChat.Infrastructure.Data
                     .HasMaxLength(1000);
 
                 entity.HasIndex(e => new { e.PsychologistId, e.ScheduledAt });
+                entity.HasIndex(e => new { e.PatientId, e.ScheduledAt });
             });
 
-            modelBuilder.Entity<ApplicationUser>().ToTable("Users");
-            modelBuilder.Entity<IdentityRole<int>>().ToTable("Roles");
-            modelBuilder.Entity<IdentityUserRole<int>>().ToTable("UserRoles");
-            modelBuilder.Entity<IdentityUserClaim<int>>().ToTable("UserClaims");
-            modelBuilder.Entity<IdentityUserLogin<int>>().ToTable("UserLogins");
-            modelBuilder.Entity<IdentityUserToken<int>>().ToTable("UserTokens");
-            modelBuilder.Entity<IdentityRoleClaim<int>>().ToTable("RoleClaims");
+            modelBuilder.Entity<ApplicationUser>().ToTable("Users"); 
+            modelBuilder.Entity<IdentityRole<int>>().ToTable("Roles"); 
+            modelBuilder.Entity<IdentityUserRole<int>>().ToTable("UserRoles"); 
+
+            modelBuilder.Ignore<IdentityUserLogin<int>>(); 
+            modelBuilder.Ignore<IdentityUserToken<int>>(); 
+            modelBuilder.Ignore<IdentityRoleClaim<int>>(); 
+            modelBuilder.Ignore<IdentityUserClaim<int>>();
         }
     }
 }
