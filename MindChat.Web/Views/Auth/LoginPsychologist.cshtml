@@ -1,0 +1,17 @@
+﻿@{
+    ViewData["Title"] = "Iniciar sesión paciente";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="login-container">
+    <h2>MindChat - Psicologos</h2>
+    <h2>Iniciar sesión</h2>
+
+    <form method="post" asp-action="LoginPatient" asp-controller="Auth">
+        
+        <div>
+            <a href="/Auth/RegisterPsychologist">Registrarse como psicologo</a>
+        </div>
+
+    </form>
+</div>

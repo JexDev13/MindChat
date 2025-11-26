@@ -15,7 +15,7 @@ namespace MindChat.Domain.Entities
 
         public string ProfessionalLicense { get; set; }
         public string University { get; set; }
-        public DateTime GraduationYear { get; set; }
+        public DateTime? GraduationDate { get; set; }
         public string? Bio { get; set; }
         public bool? IsVerified { get; set; } = false;
 

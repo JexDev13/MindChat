@@ -1,22 +1,34 @@
 using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
+using MindChat.Application.Interfaces;
+using MindChat.Application.Services;
 using MindChat.Domain.Entities;
 using MindChat.Infrastructure.Data;
 using MindChat.Infrastructure.Seed;
 using MindChat.Web.Hubs;
+using System.Text;
+
 var builder = WebApplication.CreateBuilder(args);
 
 Env.Load();
+
+builder.Configuration.AddEnvironmentVariables();
 
 var dbServer = Environment.GetEnvironmentVariable("DB_SERVER");
 var dbName = Environment.GetEnvironmentVariable("DB_NAME");
 var dbUser = Environment.GetEnvironmentVariable("DB_USER");
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
 
+var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
+var jwtExpiry = Environment.GetEnvironmentVariable("JWT_EXPIRY");
+
 var connectionString =
-    $"Server={dbServer};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=False;";
+    $"Server={dbServer};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=True;";
 
 var infraAssembly = typeof(ApplicationDbContext).Assembly.FullName;
 
@@ -51,13 +63,38 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
-// 4. Configurar AutoMapper
-//builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+    };
+});
 
-// 5. Agregar servicios de aplicación (descomentar cuando los crees)
-// builder.Services.AddScoped<IPatientService, PatientService>();
-// builder.Services.AddScoped<IPsychologistService, PsychologistService>();
-// builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+// 4. Configurar AutoMapper
+builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
+
+// 5. Agregar servicios de aplicación
+builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IPsychologistService, PsychologistService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
+
+// 6. Agregar logging con más detalle
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
@@ -113,6 +150,11 @@ app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapControllerRoute(
+    name: "login",
+    pattern: "",
+    defaults: new { controller = "Auth", action = "LoginPatient" });
 
 app.MapControllerRoute(
     name: "default",

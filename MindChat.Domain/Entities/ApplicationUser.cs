@@ -10,7 +10,7 @@ namespace MindChat.Domain.Entities
     public class ApplicationUser : IdentityUser<int>
     {
         public string FullName { get; set; }
-        public string ProfilePictureUrl { get; set; }
+        public string? ProfilePictureUrl { get; set; }
         public Patient PatientProfile { get; set; }
         public Psychologist PsychologistProfile { get; set; }
     }

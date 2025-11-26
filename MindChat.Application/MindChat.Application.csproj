@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MindChat.Domain\MindChat.Domain.csproj" />
+    <ProjectReference Include="..\MindChat.Infrastructure\MindChat.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
