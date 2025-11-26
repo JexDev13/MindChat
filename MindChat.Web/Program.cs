@@ -1,12 +1,11 @@
+using DotNetEnv;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MindChat.Domain.Entities;
 using MindChat.Infrastructure.Data;
-using DotNetEnv;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using MindChat.Web.Services;
+using MindChat.Infrastructure.Seed;
+using MindChat.Web.Hubs;
 var builder = WebApplication.CreateBuilder(args);
 
 Env.Load();
@@ -19,11 +18,10 @@ var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
 var connectionString =
     $"Server={dbServer};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=False;";
 
+var infraAssembly = typeof(ApplicationDbContext).Assembly.FullName;
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(
-        connectionString,
-        b => b.MigrationsAssembly("MindChat.Infrastructure")
-    )
+    options.UseSqlServer(connectionString, b => b.MigrationsAssembly(infraAssembly))
 );
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<int>>(options =>
@@ -53,38 +51,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
-// JWT Authentication
-var jwtSection = builder.Configuration.GetSection("Jwt");
-var jwtKey = jwtSection["Key"];
-if (string.IsNullOrEmpty(jwtKey))
-{
-    // If no key set, try environment variable
-    jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
-}
-
-builder.Services.AddSingleton<IJwtService, JwtService>();
-
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = true;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSection["Issuer"],
-        ValidAudience = jwtSection["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey ?? string.Empty))
-    };
-});
-
 // 4. Configurar AutoMapper
 //builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
 
@@ -95,52 +61,31 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddSignalR();
+
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options => { options.IdleTimeout = TimeSpan.FromMinutes(30); });
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole<int>>>();
-
-        var skipMigrations = Environment.GetEnvironmentVariable("SKIP_MIGRATIONS");
-        if (string.IsNullOrEmpty(skipMigrations) || skipMigrations != "1")
-        {
-            try
-            {
-                context.Database.Migrate();
-            }
-            catch (Exception migEx)
-            {
-                var logger = services.GetRequiredService<ILogger<Program>>();
-                logger.LogWarning(migEx, "Se produjo un error al aplicar migraciones automáticas. Saltando migraciones automáticas.");
-            }
-
-            try
-            {
-                await SeedRoles(roleManager);
-            }
-            catch (Exception seedEx)
-            {
-                var logger = services.GetRequiredService<ILogger<Program>>();
-                logger.LogWarning(seedEx, "Se produjo un error al ejecutar el seed de roles.");
-            }
-        }
-        else
-        {
-            var logger = services.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("SKIP_MIGRATIONS=1 detectado: se omiten migraciones automáticas en el arranque.");
-        }
-
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        context.Database.Migrate();
+        await IdentitySeeder.SeedCoreAsync(roleManager);
+        await TagSeeder.SeedTagAsync(context, logger);
+        logger.LogInformation("Migraci�n y seeding completados exitosamente.");
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Ocurri� un error durante la migraci�n o seed de datos.");
+        logger.LogError(ex, "Ocurri� un error durante la migraci�n o el seeding.");
     }
 }
 
@@ -159,6 +104,13 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    MinimumSameSitePolicy = SameSiteMode.Lax
+});
+
+app.UseSession();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -166,19 +118,8 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+app.MapHub<ChatHub>("/chathub");
+
 app.MapRazorPages();
 
 app.Run();
-
-static async Task SeedRoles(RoleManager<IdentityRole<int>> roleManager)
-{
-    string[] roleNames = { "Psychologist", "Patient" };
-
-    foreach (var roleName in roleNames)
-    {
-        if (!await roleManager.RoleExistsAsync(roleName))
-        {
-            await roleManager.CreateAsync(new IdentityRole<int>(roleName));
-        }
-    }
-}

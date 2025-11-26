@@ -1,4 +1,4 @@
-namespace MindChat.Web.Models
+﻿namespace MindChat.Web.Models
 {
     public class ErrorViewModel
     {
