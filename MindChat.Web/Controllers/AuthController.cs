@@ -14,13 +14,15 @@ public class AuthController : Controller
     private readonly ILogger<AuthController> _logger;
     private readonly ITokenService _tokenService;
     private readonly IAuthService _authService;
+    private readonly IEmailService _emailService;
 
     public AuthController(
         IPatientService patientService, 
         ILogger<AuthController> logger, 
         IPsychologistService psychologistService,
         ITokenService tokenService,
-        IAuthService authService
+        IAuthService authService,
+        IEmailService emailService
         )
     {
         _patientService = patientService;
@@ -28,6 +30,7 @@ public class AuthController : Controller
         _psychologistService = psychologistService;
         _tokenService = tokenService;
         _authService = authService;
+        _emailService = emailService;
     }
 
     [HttpGet] public IActionResult LoginPatient() => View();
@@ -161,6 +164,9 @@ public class AuthController : Controller
             "Auth",
             new { email = user.Email, token = token },
             Request.Scheme);
+
+        var htmlMessage = $"<p>Hola, haz clic <a href='{resetLink}'>aquí</a> para restablecer tu contraseña.</p>";
+        await _emailService.SendEmailAsync(user.Email, "Restablecer contraseña - MindChat", htmlMessage);
 
         _logger.LogInformation($"Password reset link: {resetLink}");
 

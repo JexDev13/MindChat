@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MindChat.Application.Configuration;
 using MindChat.Application.Interfaces;
 using MindChat.Application.Services;
 using MindChat.Domain.Entities;
@@ -26,6 +27,12 @@ var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
 var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
 var jwtExpiry = Environment.GetEnvironmentVariable("JWT_EXPIRY");
+
+var emailSmtpHost = Environment.GetEnvironmentVariable("EMAIL_SMTP_HOST");
+var emailSmtpPort = Environment.GetEnvironmentVariable("EMAIL_SMTP_PORT");
+var emailSenderName = Environment.GetEnvironmentVariable("EMAIL_SENDER_NAME");
+var emailSenderEmail = Environment.GetEnvironmentVariable("EMAIL_SENDER_EMAIL");
+var emailPassword = Environment.GetEnvironmentVariable("EMAIL_PASSWORD");
 
 var connectionString =
     $"Server={dbServer};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=True;";
@@ -82,6 +89,15 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.Configure<EmailSettings>(options =>
+{
+    options.SmtpHost = emailSmtpHost;
+    options.SmtpPort = int.Parse(emailSmtpPort ?? "587");
+    options.SenderName = emailSenderName;
+    options.SenderEmail = emailSenderEmail;
+    options.Password = emailPassword;
+});
+
 // 4. Configurar AutoMapper
 builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
 
@@ -90,6 +106,7 @@ builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IPsychologistService, PsychologistService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // 6. Agregar logging con más detalle
 builder.Logging.ClearProviders();
