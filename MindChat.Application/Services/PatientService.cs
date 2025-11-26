@@ -1,4 +1,8 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MindChat.Application.DTOs.Patients;
@@ -69,6 +73,64 @@ namespace MindChat.Application.Services
             catch (Exception ex)
             {
                 return (false, new[] { $"Error inesperado: {ex.Message}" });
+            }
+        }
+
+        // Devuelve chats relacionados con el usuario (asumiendo que se usa UserId para resolver Patient)
+        public async Task<IEnumerable<Chat>> GetChatsAsync(int userId)
+        {
+            try
+            {
+                var patient = await _context.Patients
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UserId == userId);
+
+                if (patient == null)
+                {
+                    _logger.LogWarning("No se encontró Patient para UserId {UserId}", userId);
+                    return Enumerable.Empty<Chat>();
+                }
+
+                var chats = await _context.Chats
+                    .AsNoTracking()
+                    .Include(c => c.Messages)
+                        .ThenInclude(m => m.Sender)
+                    .Include(c => c.SessionRequest)
+                        .ThenInclude(sr => sr.AssignedPsychologist)
+                            .ThenInclude(ps => ps.User)
+                    .Where(c => c.SessionRequest.PatientId == patient.Id)
+                    .OrderByDescending(c => c.Id)
+                    .ToListAsync();
+
+                return chats;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener chats para UserId {UserId}", userId);
+                return Enumerable.Empty<Chat>();
+            }
+        }
+
+        // Devuelve todos los psicólogos cuyo perfil está visible
+        public async Task<IEnumerable<Psychologist>> GetVisiblePsychologistsAsync()
+        {
+            try
+            {
+                var psychologists = await _context.Psychologists
+                    .AsNoTracking()
+                    .Include(p => p.User)
+                    .Include(p => p.PsychologistTags)
+                        .ThenInclude(pt => pt.Tag)
+                    .Where(p => p.IsProfileVisible)
+                    .OrderBy(p => p.User.FullName)
+                    .ToListAsync();
+
+                return psychologists;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener psicólogos visibles");
+                return Enumerable.Empty<Psychologist>();
             }
         }
     }

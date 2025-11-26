@@ -6,6 +6,7 @@ namespace MindChat.Application.Interfaces
     public interface IAuthService
     {
         Task<ApplicationUser?> FindByUsernameAsync(string username);
+        Task<ApplicationUser?> FindByIdAsync(int userId);
         Task<bool> CheckPasswordAsync(ApplicationUser user, string password);
         Task<IList<string>> GetRolesAsync(ApplicationUser user);
         Task<string?> GeneratePasswordResetTokenAsync(ApplicationUser user);

@@ -1,79 +1,142 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using MindChat.Application.Interfaces;
+using MindChat.Domain.Entities;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace MindChat.Web.Controllers
 {
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
+        private readonly IPatientService _patientService;
+        private readonly IPsychologistService _psychologistService;
+        private readonly IAuthService _authService;
+        private readonly ITokenService _tokenService;
 
-        public HomeController(ILogger<HomeController> logger)
+        public HomeController(
+            ILogger<HomeController> logger,
+            IPatientService patientService,
+            IPsychologistService psychologistService,
+            IAuthService authService,
+            ITokenService tokenService
+        )
         {
             _logger = logger;
+            _authService = authService;
+            _psychologistService = psychologistService;
+            _patientService = patientService;
+            _tokenService = tokenService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            // Obtener perfil activo de la sesión
-            var activeProfile = HttpContext.Session.GetString("ActiveProfile") ?? "Patient";
-
-            _logger.LogInformation("=== INDEX ACTION ===");
-            _logger.LogInformation($"Perfil obtenido de sesión: {activeProfile}");
-
-            // Si no existe en sesión, establecerlo
-            if (HttpContext.Session.GetString("ActiveProfile") == null)
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrEmpty(jwt))
             {
-                HttpContext.Session.SetString("ActiveProfile", activeProfile);
-                _logger.LogInformation($"Perfil establecido en sesión por primera vez: {activeProfile}");
+                _logger.LogWarning("No hay sesión activa. Redirigiendo a login.");
+                return RedirectToAction("LoginPatient", "Auth");
             }
+            var tokenHandler = new JwtSecurityTokenHandler();
 
-            var userName = activeProfile == "Patient" ? "Pedro Ramon" : "Lucia Fernanda";
-            var participantName = activeProfile == "Patient" ? "Lucia Fernanda" : "Pedro Ramon";
+            try
+            {
+                var validationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER"),
+                    ValidAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("JWT_KEY")!))
+                };
 
-            _logger.LogInformation($"UserName: {userName}");
-            _logger.LogInformation($"ParticipantName: {participantName}");
-            _logger.LogInformation($"ChatId: 1");
-            _logger.LogInformation("===================");
+                var jwtToken = tokenHandler.ReadJwtToken(jwt);
+                var principal = tokenHandler.ValidateToken(jwt, validationParameters, out var validatedToken);
 
-            // Pasar datos a la vista
-            ViewData["ActiveProfile"] = activeProfile;
-            ViewData["UserName"] = userName;
-            ViewData["ParticipantName"] = participantName;
-            ViewData["ChatId"] = 1;
+                var userId = jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+                var email = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
+                var activeProfile = jwtToken.Claims.FirstOrDefault(c => c.Type == "activeProfile")?.Value;
 
-            return View();
+                if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out var userIdInt))
+                {
+                    _logger.LogWarning("UserId inválido en el token.");
+                    return RedirectToAction("LoginPatient", "Auth");
+                }
+
+                _logger.LogInformation($"Token válido. UserId: {userIdInt}, Email: {email}, Profile: {activeProfile}");
+
+                var user = await _authService.FindByIdAsync(userIdInt);
+                if (user == null)
+                    return NotFound("No existe el usuario");
+
+                IEnumerable<Chat> chats = Enumerable.Empty<Chat>();
+                IEnumerable<Psychologist> visiblePsychologists = Enumerable.Empty<Psychologist>();
+                IEnumerable<Appointment> appointments = Enumerable.Empty<Appointment>();
+
+                if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+                {
+                    chats = await _patientService.GetChatsAsync(userIdInt);
+                    visiblePsychologists = await _patientService.GetVisiblePsychologistsAsync();
+                    ViewData["Psychologists"] = visiblePsychologists;
+                }
+                else if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+                {
+                    chats = await _psychologistService.GetChatsAsync(userIdInt);
+                    appointments = await _psychologistService.GetAppointmentsAsync(userIdInt);
+                    ViewData["Appointments"] = appointments;
+                }
+
+                ViewData["UserName"] = user.FullName;
+                ViewData["ActiveProfile"] = activeProfile;
+                ViewData["Chats"] = chats;
+
+                return View();
+            }
+            catch (SecurityTokenException ex)
+            {
+                _logger.LogWarning($"Token inválido: {ex.Message}");
+                return RedirectToAction("LoginPatient", "Auth");
+            }
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult SwitchProfile()
         {
-            _logger.LogInformation("=== SWITCH PROFILE ACTION ===");
-
-            // Obtener perfil actual
             var currentProfile = HttpContext.Session.GetString("ActiveProfile") ?? "Patient";
-            _logger.LogInformation($"Perfil actual antes del cambio: {currentProfile}");
-
-            // Cambiar al otro perfil
             var newProfile = currentProfile == "Patient" ? "Psychologist" : "Patient";
-            _logger.LogInformation($"Nuevo perfil a establecer: {newProfile}");
-
-            // Guardar en sesión
             HttpContext.Session.SetString("ActiveProfile", newProfile);
-            _logger.LogInformation($"Perfil guardado en sesión: {newProfile}");
-
-            // Verificar que se guardó correctamente
-            var verifyProfile = HttpContext.Session.GetString("ActiveProfile");
-            _logger.LogInformation($"Verificación - Perfil en sesión después de guardar: {verifyProfile}");
-
-            if (verifyProfile != newProfile)
-            {
-                _logger.LogError($"ERROR: El perfil no se guardó correctamente. Esperado: {newProfile}, Obtenido: {verifyProfile}");
-            }
-
-            _logger.LogInformation("Redirigiendo a Index...");
-            _logger.LogInformation("=============================");
-
             return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Logout()
+        {
+            try
+            {
+                await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                HttpContext.Session.Clear();
+                if (Request.Cookies.ContainsKey("JWT"))
+                {
+                    Response.Cookies.Delete("JWT");
+                }
+
+                _logger.LogInformation("Usuario desconectado correctamente.");
+
+                return RedirectToAction("LoginPatient", "Auth");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cerrar sesión.");
+                return RedirectToAction("LoginPatient", "Auth");
+            }
         }
     }
 }

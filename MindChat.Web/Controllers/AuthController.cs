@@ -94,7 +94,7 @@ public class AuthController : Controller
         }
 
         var roles = await _authService.GetRolesAsync(user);
-        var token = _tokenService.GenerateToken(user, UserRole.Patient.ToString(), roles);
+        var token = _tokenService.GenerateToken(user, UserRole.Psychologist.ToString(), roles);
 
         HttpContext.Session.SetString("JWT", token);
 

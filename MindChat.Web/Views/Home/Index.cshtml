@@ -1,125 +1,197 @@
 ﻿@{
     ViewData["Title"] = "MindChat";
     Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var activeProfile = (ViewData["ActiveProfile"] as string ?? "Patient");
+    var userName = ViewData["UserName"] as string ?? "";
+    var chats = ViewData["Chats"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var psychologists = ViewData["Psychologists"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var appointments = ViewData["Appointments"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var currentChatId = ViewData["ChatId"] ?? 1;
 }
 
 <div>
     <div>
-        <h2>Bienvenido @ViewData["UserName"]</h2>
-        <p><strong>Perfil activo:</strong> @ViewData["ActiveProfile"]</p>
+        <h2>Bienvenido, @userName</h2>
 
-        <form method="post" action="@Url.Action("SwitchProfile", "Home")" id="switchProfileForm">
+        <form method="post" asp-action="Logout">
             @Html.AntiForgeryToken()
-            <button type="submit" id="switchBtn">
-                Cambiar a @(ViewData["ActiveProfile"].ToString() == "Patient" ? "Psicólogo" : "Paciente")
+            <button type="submit">Cerrar sesión</button>
+        </form>
+
+        <form method="post" asp-action="SwitchProfile">
+            @Html.AntiForgeryToken()
+            <button type="submit">
+                Cambiar a @(activeProfile == "Patient" ? "Psicólogo" : "Paciente")
             </button>
         </form>
     </div>
 
     <div>
+        <!-- Sección: User Profile (siempre visible) -->
         <div>
-            <h3>Chat con @ViewData["ParticipantName"]</h3>
+            <h3>Perfil de Usuario</h3>
+            <p>Nombre: @userName</p>
+            <p>Perfil activo: @activeProfile</p>
         </div>
 
-        <div id="messages">
-            <!-- Mensajes -->
+        <!-- Sección: Chats (siempre visible) -->
+        <div>
+            <h3>Chats</h3>
+            @if (!chats.Any())
+            {
+                <p>No hay chats disponibles.</p>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var chat in chats)
+                    {
+                        var lastMessage = (chat.Messages != null && ((IEnumerable<dynamic>)chat.Messages).Any())
+                            ? ((IEnumerable<dynamic>)chat.Messages).Last().Message
+                            : "Sin mensajes";
+                        <li>
+                            <strong>Chat #@chat.Id</strong>
+                            <div>@lastMessage</div>
+                        </li>
+                    }
+                </ul>
+            }
         </div>
 
+        <!-- Si el perfil activo es Patient: listar psicólogos visibles -->
+        @if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+        {
+            <div>
+                <h3>Psicólogos Disponibles</h3>
+                @if (!psychologists.Any())
+                {
+                    <p>No hay psicólogos visibles en este momento.</p>
+                }
+                else
+                {
+                    <ul>
+                        @foreach (var psy in psychologists)
+                        {
+                            <li>
+                                <div>
+                                    <strong>@(psy.User?.FullName ?? "Psicólogo")</strong>
+                                    @if (!string.IsNullOrEmpty(psy.Bio))
+                                    {
+                                        <div>@psy.Bio</div>
+                                    }
+                                    <div>
+                                        <!-- Botón "chateat" (puedes enlazar a la acción que inicie/recupere el chat) -->
+                                        <button type="button" class="start-chat-btn" data-psychologist-id="@psy.Id">chateat</button>
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+        <!-- Si el perfil activo es Psychologist: listar citas -->
+        else if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+        {
+            <div>
+                <h3>Mis Citas</h3>
+                @if (!appointments.Any())
+                {
+                    <p>No hay citas programadas.</p>
+                }
+                else
+                {
+                    <ul>
+                        @foreach (var appt in appointments)
+                        {
+                            var patientName = appt.Patient?.User?.FullName ?? "Paciente";
+                            <li>
+                                <div>
+                                    <strong>@patientName</strong> - @((DateTime)appt.ScheduledAt).ToString("g")
+                                    @if (!string.IsNullOrEmpty(appt.Notes))
+                                    {
+                                        <div>@appt.Notes</div>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        <!-- Sección: Chat Web -->
         <div>
+            <h3>Chat</h3>
+            <div id="messages"></div>
             <input type="text" id="messageInput" placeholder="Escribe un mensaje..." />
             <button id="sendBtn">Enviar</button>
+            <div id="connectionStatus"></div>
         </div>
     </div>
-
-    <div id="connectionStatus"></div>
 </div>
 
 @section Scripts {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
     <script>
-        const chatId = @ViewData["ChatId"];
-        const userName = "@ViewData["UserName"]";
+        // inicia con el chat seleccionado por el servidor
+        let chatId = @currentChatId;
+        const userName = "@userName";
         const statusDiv = document.getElementById("connectionStatus");
+        const messagesDiv = document.getElementById("messages");
 
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/chathub")
             .withAutomaticReconnect()
             .build();
 
-        function showStatus(message) {
-            statusDiv.textContent = message;
-        }
+        function showStatus(message) { statusDiv.textContent = message; }
 
         connection.on("ReceiveMessage", (chatIdReceived, message, sender) => {
             if (chatIdReceived === chatId) {
-                const msgDiv = document.getElementById("messages");
-                const isCurrentUser = sender === userName;
-
-                const messageHtml = `
-                    <div>
-                        <div>
-                            <div>
-                                ${sender}
-                            </div>
-                            <div>${message}</div>
-                            <div>
-                                ${new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                msgDiv.innerHTML += messageHtml;
-                msgDiv.scrollTop = msgDiv.scrollHeight;
+                messagesDiv.innerHTML += `<div><strong>${sender}:</strong> ${message}</div>`;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }
         });
 
-        connection.onreconnecting(() => {
-            showStatus("Reconectando...");
-        });
-
+        connection.onreconnecting(() => showStatus("Reconectando..."));
         connection.onreconnected(() => {
             showStatus("Reconectado");
             connection.invoke("JoinChat", chatId);
         });
-
         connection.onclose(() => {
             showStatus("Conexión perdida. Recargando...");
             setTimeout(() => location.reload(), 2000);
         });
 
         connection.start()
-            .then(() => {
-                showStatus("Conectado");
-                return connection.invoke("JoinChat", chatId);
-            })
-            .catch(() => {
-                showStatus("Error al conectar. Recargando...");
-                setTimeout(() => location.reload(), 2000);
-            });
+            .then(() => connection.invoke("JoinChat", chatId).then(() => showStatus("Conectado")))
+            .catch(() => { showStatus("Error al conectar. Recargando..."); setTimeout(() => location.reload(), 2000); });
 
         function sendMessage() {
             const input = document.getElementById("messageInput");
             const message = input.value.trim();
-
-            if (message !== "") {
+            if (message) {
                 connection.invoke("SendMessage", chatId, message, userName)
-                    .then(() => {
-                        input.value = "";
-                    })
-                    .catch(() => {
-                        showStatus("Error al enviar mensaje");
-                    });
+                    .then(() => input.value = "")
+                    .catch(() => showStatus("Error al enviar mensaje"));
             }
         }
 
         document.getElementById("sendBtn").addEventListener("click", sendMessage);
+        document.getElementById("messageInput").addEventListener("keypress", e => {
+            if (e.key === 'Enter') { sendMessage(); e.preventDefault(); }
+        });
 
-        document.getElementById("messageInput").addEventListener("keypress", function (e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-                e.preventDefault();
-            }
+        // Handler para botones "chateat" (puedes llamar a una acción que cree/abra el chat desde el servidor)
+        document.querySelectorAll(".start-chat-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const psyId = btn.getAttribute("data-psychologist-id");
+                // placeholder: redirigir a la ruta que inicia/recupera un chat con el psicólogo
+                // por ejemplo: /SessionRequest/Create?psychologistId=...
+                window.location.href = `/SessionRequest/Create?psychologistId=${psyId}`;
+            });
         });
 
         window.addEventListener("beforeunload", () => {
