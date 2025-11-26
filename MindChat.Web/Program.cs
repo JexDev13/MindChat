@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using MindChat.Domain.Entities;
 using MindChat.Infrastructure.Data;
 using MindChat.Infrastructure.Seed;
+using MindChat.Web.Hubs;
 var builder = WebApplication.CreateBuilder(args);
 
 Env.Load();
@@ -60,6 +61,10 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddSignalR();
+
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options => { options.IdleTimeout = TimeSpan.FromMinutes(30); });
 
 var app = builder.Build();
 
@@ -99,12 +104,21 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    MinimumSameSitePolicy = SameSiteMode.Lax
+});
+
+app.UseSession();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapHub<ChatHub>("/chathub");
 
 app.MapRazorPages();
 

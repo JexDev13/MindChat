@@ -23,8 +23,4 @@
     <ProjectReference Include="..\MindChat.Infrastructure\MindChat.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Controllers\" />
-  </ItemGroup>
-
 </Project>
