@@ -12,18 +12,21 @@ public class AuthController : Controller
     private readonly IPsychologistService _psychologistService;
     private readonly ILogger<AuthController> _logger;
     private readonly ITokenService _tokenService;
+    private readonly IAuthService _authService;
 
     public AuthController(
         IPatientService patientService, 
         ILogger<AuthController> logger, 
         IPsychologistService psychologistService,
-        ITokenService tokenService
+        ITokenService tokenService,
+        IAuthService authService
         )
     {
         _patientService = patientService;
         _logger = logger;
         _psychologistService = psychologistService;
         _tokenService = tokenService;
+        _authService = authService;
     }
 
     [HttpGet] public IActionResult LoginPatient() => View();
@@ -38,21 +41,21 @@ public class AuthController : Controller
             return View();
         }
 
-        var user = await _patientService.FindByUsernameAsync(username);
+        var user = await _authService.FindByUsernameAsync(username);
         if (user == null)
         {
             ModelState.AddModelError("", "Usuario o contraseña inválidos.");
             return View();
         }
 
-        var passwordValid = await _patientService.CheckPasswordAsync(user, password);
+        var passwordValid = await _authService.CheckPasswordAsync(user, password);
         if (!passwordValid)
         {
             ModelState.AddModelError("", "Usuario o contraseña inválidos.");
             return View();
         }
 
-        var roles = await _patientService.GetRolesAsync(user);
+        var roles = await _authService.GetRolesAsync(user);
         var token = _tokenService.GenerateToken(user, UserRole.Patient.ToString(), roles);
 
         HttpContext.Session.SetString("JWT", token);
@@ -62,6 +65,38 @@ public class AuthController : Controller
 
     [HttpGet] public IActionResult ForgotPassword() => View(); 
     [HttpGet] public IActionResult LoginPsychologist() => View();
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LoginPsychologist(string username, string password)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            ModelState.AddModelError("", "Usuario y contraseña son requeridos.");
+            return View();
+        }
+
+        var user = await _authService.FindByUsernameAsync(username);
+        if (user == null)
+        {
+            ModelState.AddModelError("", "Usuario o contraseña inválidos.");
+            return View();
+        }
+
+        var passwordValid = await _authService.CheckPasswordAsync(user, password);
+        if (!passwordValid)
+        {
+            ModelState.AddModelError("", "Usuario o contraseña inválidos.");
+            return View();
+        }
+
+        var roles = await _authService.GetRolesAsync(user);
+        var token = _tokenService.GenerateToken(user, UserRole.Patient.ToString(), roles);
+
+        HttpContext.Session.SetString("JWT", token);
+
+        return RedirectToAction("Index", "Home");
+    }
 
     [HttpGet]
     public IActionResult RegisterPatient() => View();
@@ -103,6 +138,4 @@ public class AuthController : Controller
 
         return RedirectToAction("LoginPsychologist");
     }
-
-
 }

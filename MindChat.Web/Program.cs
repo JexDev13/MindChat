@@ -89,6 +89,7 @@ builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoM
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IPsychologistService, PsychologistService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 // 6. Agregar logging con más detalle
 builder.Logging.ClearProviders();
@@ -152,13 +153,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
-    name: "login",
-    pattern: "",
-    defaults: new { controller = "Auth", action = "LoginPatient" });
-
-app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern: "{controller=Auth}/{action=LoginPatient}/{id?}");
 
 app.MapHub<ChatHub>("/chathub");
 

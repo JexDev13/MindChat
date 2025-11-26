@@ -11,8 +11,5 @@ namespace MindChat.Application.Interfaces
     public interface IPatientService
     {
         Task<(bool Success, IEnumerable<string> Errors)> RegisterAsync(RegisterPatientDto dto);
-        Task<ApplicationUser?> FindByUsernameAsync(string username);
-        Task<bool> CheckPasswordAsync(ApplicationUser user, string password);
-        Task<IList<string>> GetRolesAsync(ApplicationUser user);
     }
 }

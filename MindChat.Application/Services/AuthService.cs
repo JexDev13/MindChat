@@ -1,0 +1,44 @@
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using MindChat.Application.DTOs.Patients;
+using MindChat.Application.Helpers;
+using MindChat.Application.Interfaces;
+using MindChat.Domain.Entities;
+using MindChat.Domain.Enums;
+using MindChat.Infrastructure.Data;
+
+namespace MindChat.Application.Services
+{
+    public class AuthService : IAuthService
+    {
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ApplicationDbContext _context;
+        private readonly ILogger<PatientService> _logger;
+
+        public AuthService(
+            UserManager<ApplicationUser> userManager,
+            ApplicationDbContext context,
+            ILogger<PatientService> logger)
+        {
+            _userManager = userManager;
+            _context = context;
+            _logger = logger;
+        }
+
+        public async Task<ApplicationUser?> FindByUsernameAsync(string userEmail)
+        {
+            return await _userManager.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
+        }
+
+        public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password)
+        {
+            return await _userManager.CheckPasswordAsync(user, password);
+        }
+
+        public async Task<IList<string>> GetRolesAsync(ApplicationUser user)
+        {
+            return await _userManager.GetRolesAsync(user);
+        }
+    }
+}

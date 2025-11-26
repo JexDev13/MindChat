@@ -71,22 +71,5 @@ namespace MindChat.Application.Services
                 return (false, new[] { $"Error inesperado: {ex.Message}" });
             }
         }
-
-        public async Task<ApplicationUser?> FindByUsernameAsync(string userEmail)
-        {
-            return await _userManager.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
-        }
-
-        public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password)
-        {
-            return await _userManager.CheckPasswordAsync(user, password);
-        }
-
-        public async Task<IList<string>> GetRolesAsync(ApplicationUser user)
-        {
-            return await _userManager.GetRolesAsync(user);
-        }
-
-
     }
 }
