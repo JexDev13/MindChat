@@ -1,0 +1,51 @@
+﻿@{
+    ViewData["Title"] = "Iniciar sesión paciente";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="login-container">
+    <h2>MindChat - Pacientes</h2>
+    <h2>Iniciar sesión</h2>
+
+    <form method="post" asp-action="LoginPatient" asp-controller="Auth">
+        @Html.AntiForgeryToken()
+
+        <div>
+            <label for="username">Usuario</label>
+            <input type="text" id="username" name="username" required />
+        </div>
+
+        <div>
+            <label for="password">Contraseña</label>
+            <div style="display:flex; gap:10px;">
+                <input type="password" id="password" name="password" required />
+                <button type="button" id="togglePassword">👁</button>
+            </div>
+        </div>
+
+        <button type="submit">Ingresar</button>
+
+        <div>
+            <a href="/Auth/ForgotPassword">Olvidé mi contraseña</a>
+        </div>
+
+        <div>
+            <a href="/Auth/RegisterPatient">Registrarse como paciente</a>
+        </div>
+
+        <div>
+            <a href="/Auth/LoginPsychologist">Soy psicólogo</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        const btn = document.getElementById("togglePassword");
+        const pwd = document.getElementById("password");
+
+        btn.addEventListener("click", () => {
+            pwd.type = pwd.type === "password" ? "text" : "password";
+        });
+    </script>
+}

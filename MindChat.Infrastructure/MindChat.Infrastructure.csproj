@@ -21,4 +21,8 @@
     <ProjectReference Include="..\MindChat.Domain\MindChat.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Migrations\" />
+  </ItemGroup>
+
 </Project>
