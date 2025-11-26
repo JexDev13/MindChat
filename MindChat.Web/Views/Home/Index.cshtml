@@ -4,34 +4,40 @@
 }
 
 <div>
-    <div>
-        <h2>Bienvenido @ViewData["UserName"]</h2>
-        <p><strong>Perfil activo:</strong> @ViewData["ActiveProfile"]</p>
+    <!-- Pantalla de bienvenida -->
+    <div id="welcomeScreen" style="text-align:center; margin-top:40px;">
+        <h1>Bienvenido @ViewData["UserName"]</h1>
+        <p>Perfil activo: <strong>@ViewData["ActiveProfile"]</strong></p>
 
-        <form method="post" action="@Url.Action("SwitchProfile", "Home")" id="switchProfileForm">
-            @Html.AntiForgeryToken()
-            <button type="submit" id="switchBtn">
-                Cambiar a @(ViewData["ActiveProfile"].ToString() == "Patient" ? "Psicólogo" : "Paciente")
-            </button>
-        </form>
-    </div>
+        <div style="margin-bottom:12px;">
+            <button id="openChatBtn" style="padding:10px 20px; font-size:16px; margin-right:8px;">Chatear</button>
 
-    <div>
-        <div>
-            <h3>Chat con @ViewData["ParticipantName"]</h3>
-        </div>
-
-        <div id="messages">
-            <!-- Mensajes -->
-        </div>
-
-        <div>
-            <input type="text" id="messageInput" placeholder="Escribe un mensaje..." />
-            <button id="sendBtn">Enviar</button>
+            <form method="post" action="@Url.Action("SwitchProfile", "Home")" style="display:inline-block;" id="switchProfileForm">
+                @Html.AntiForgeryToken()
+                <button type="submit" id="switchBtn" style="padding:10px 12px; font-size:14px;">Cambiar a @(ViewData["ActiveProfile"].ToString() == "Patient" ? "Psicólogo" : "Paciente")</button>
+            </form>
         </div>
     </div>
 
-    <div id="connectionStatus"></div>
+    <!-- Contenedor del chat (oculto inicialmente) -->
+    <div id="chatContainer" style="display:none; margin-top:20px;">
+        <div>
+            <div>
+                <h3>Chat con @ViewData["ParticipantName"]</h3>
+            </div>
+
+            <div id="messages" style="border:1px solid #ccc; height:300px; overflow:auto; padding:8px;">
+                <!-- Mensajes -->
+            </div>
+
+            <div style="margin-top:8px;">
+                <input type="text" id="messageInput" placeholder="Escribe un mensaje..." style="width:70%; padding:6px;" />
+                <button id="sendBtn" style="padding:6px 12px;">Enviar</button>
+            </div>
+        </div>
+
+        <div id="connectionStatus" style="margin-top:8px;"></div>
+    </div>
 </div>
 
 @section Scripts {
@@ -41,62 +47,52 @@
         const userName = "@ViewData["UserName"]";
         const statusDiv = document.getElementById("connectionStatus");
 
-        const connection = new signalR.HubConnectionBuilder()
-            .withUrl("/chathub")
-            .withAutomaticReconnect()
-            .build();
+        let connection = null;
 
         function showStatus(message) {
             statusDiv.textContent = message;
         }
 
-        connection.on("ReceiveMessage", (chatIdReceived, message, sender) => {
-            if (chatIdReceived === chatId) {
-                const msgDiv = document.getElementById("messages");
-                const isCurrentUser = sender === userName;
+        function startConnection() {
+            // Crear conexión y registrar handlers
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl("/chathub")
+                .withAutomaticReconnect()
+                .build();
 
-                const messageHtml = `
-                    <div>
-                        <div>
-                            <div>
-                                ${sender}
-                            </div>
-                            <div>${message}</div>
-                            <div>
-                                ${new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                        </div>
-                    </div>
-                `;
+            connection.on("ReceiveMessage", (chatIdReceived, message, sender) => {
+                if (chatIdReceived === chatId) {
+                    const msgDiv = document.getElementById("messages");
+                    const messageHtml = `\n                        <div style="margin-bottom:8px;">\n                            <div style="font-weight:600;">${sender}</div>\n                            <div>${message}</div>\n                            <div style="font-size:11px; color:#666;">${new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}</div>\n                        </div>\n                    `;
 
-                msgDiv.innerHTML += messageHtml;
-                msgDiv.scrollTop = msgDiv.scrollHeight;
-            }
-        });
+                    msgDiv.innerHTML += messageHtml;
+                    msgDiv.scrollTop = msgDiv.scrollHeight;
+                }
+            });
 
-        connection.onreconnecting(() => {
-            showStatus("Reconectando...");
-        });
+            connection.onreconnecting(() => {
+                showStatus("Reconectando...");
+            });
 
-        connection.onreconnected(() => {
-            showStatus("Reconectado");
-            connection.invoke("JoinChat", chatId);
-        });
+            connection.onreconnected(() => {
+                showStatus("Reconectado");
+                connection.invoke("JoinChat", chatId);
+            });
 
-        connection.onclose(() => {
-            showStatus("Conexión perdida. Recargando...");
-            setTimeout(() => location.reload(), 2000);
-        });
-
-        connection.start()
-            .then(() => {
-                showStatus("Conectado");
-                return connection.invoke("JoinChat", chatId);
-            })
-            .catch(() => {
-                showStatus("Error al conectar. Recargando...");
+            connection.onclose(() => {
+                showStatus("Conexión perdida. Recargando...");
                 setTimeout(() => location.reload(), 2000);
             });
+
+            connection.start()
+                .then(() => {
+                    showStatus("Conectado");
+                    return connection.invoke("JoinChat", chatId);
+                })
+                .catch(() => {
+                    showStatus("Error al conectar. Intenta recargar la página");
+                });
+        }
 
         function sendMessage() {
             const input = document.getElementById("messageInput");
@@ -123,9 +119,16 @@
         });
 
         window.addEventListener("beforeunload", () => {
-            if (connection.state === signalR.HubConnectionState.Connected) {
+            if (connection && connection.state === signalR.HubConnectionState.Connected) {
                 connection.invoke("LeaveChat", chatId);
             }
+        });
+
+        // Mostrar chat al pulsar "Chatear" e iniciar conexión
+        document.getElementById("openChatBtn").addEventListener("click", function () {
+            document.getElementById("welcomeScreen").style.display = 'none';
+            document.getElementById("chatContainer").style.display = 'block';
+            startConnection();
         });
     </script>
 }
