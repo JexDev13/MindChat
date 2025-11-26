@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using MindChat.Application.DTOs.Auth;
 using MindChat.Application.DTOs.Patients;
 using MindChat.Application.DTOs.Psychologists;
 using MindChat.Application.Interfaces;
@@ -63,7 +64,6 @@ public class AuthController : Controller
         return RedirectToAction("Index", "Home");
     }
 
-    [HttpGet] public IActionResult ForgotPassword() => View(); 
     [HttpGet] public IActionResult LoginPsychologist() => View();
 
     [HttpPost]
@@ -137,5 +137,79 @@ public class AuthController : Controller
         }
 
         return RedirectToAction("LoginPsychologist");
+    }
+
+    [HttpGet] public IActionResult ForgotPassword() => View();
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+            return View(dto);
+
+        var user = await _authService.FindByUsernameAsync(dto.Email);
+        if (user == null)
+        {
+            return RedirectToAction("ForgotPasswordConfirmation");
+        }
+
+        var token = await _authService.GeneratePasswordResetTokenAsync(user);
+
+        var resetLink = Url.Action(
+            "ResetPassword",
+            "Auth",
+            new { email = user.Email, token = token },
+            Request.Scheme);
+
+        _logger.LogInformation($"Password reset link: {resetLink}");
+
+        return RedirectToAction("ForgotPasswordConfirmation");
+    }
+
+    [HttpGet] public IActionResult ForgotPasswordConfirmation() => View();
+
+    [HttpGet]
+    public IActionResult ResetPassword(string email, string token)
+    {
+        return View(new ResetPasswordDto
+        {
+            Email = email,
+            Token = token
+        });
+    }
+
+    [HttpGet] public IActionResult ResetPasswordConfirmation() => View();
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+            return View(dto);
+
+        if (dto.Password != dto.ConfirmPassword)
+        {
+            ModelState.AddModelError("", "Las contraseñas no coinciden.");
+            return View(dto);
+        }
+
+        var user = await _authService.FindByUsernameAsync(dto.Email);
+        if (user == null)
+        {
+            return RedirectToAction("ResetPasswordConfirmation");
+        }
+
+        var result = await _authService.ResetPasswordAsync(user, dto.Token, dto.Password);
+
+        if (!result.Succeeded)
+        {
+            foreach (var err in result.Errors)
+                ModelState.AddModelError("", err.Description);
+
+            return View(dto);
+        }
+
+        return RedirectToAction("ResetPasswordConfirmation");
     }
 }

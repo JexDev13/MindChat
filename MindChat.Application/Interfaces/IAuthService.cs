@@ -1,9 +1,5 @@
 ﻿using MindChat.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 
 namespace MindChat.Application.Interfaces
 {
@@ -12,5 +8,7 @@ namespace MindChat.Application.Interfaces
         Task<ApplicationUser?> FindByUsernameAsync(string username);
         Task<bool> CheckPasswordAsync(ApplicationUser user, string password);
         Task<IList<string>> GetRolesAsync(ApplicationUser user);
+        Task<string?> GeneratePasswordResetTokenAsync(ApplicationUser user);
+        Task<IdentityResult> ResetPasswordAsync(ApplicationUser user, string token, string newPassword);
     }
 }
