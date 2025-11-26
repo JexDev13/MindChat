@@ -1,0 +1,52 @@
+@model MindChat.Web.Models.Auth.RegisterPsychologistDto
+
+@{
+    ViewData["Title"] = "Registro Psicólogo";
+}
+
+<h2>Registro Psicólogo</h2>
+
+<form asp-action="RegisterPsychologist" method="post">
+    <div>
+        <label asp-for="FullName"></label>
+        <input asp-for="FullName" />
+        <span asp-validation-for="FullName"></span>
+    </div>
+    <div>
+        <label asp-for="Email"></label>
+        <input asp-for="Email" />
+        <span asp-validation-for="Email"></span>
+    </div>
+    <div>
+        <label asp-for="Password"></label>
+        <input asp-for="Password" type="password" />
+        <span asp-validation-for="Password"></span>
+    </div>
+    <div>
+        <label asp-for="ProfessionalLicense"></label>
+        <input asp-for="ProfessionalLicense" />
+    </div>
+    <div>
+        <label asp-for="University"></label>
+        <input asp-for="University" />
+    </div>
+    <div>
+        <label asp-for="GraduationYear"></label>
+        <input asp-for="GraduationYear" type="date" />
+    </div>
+    <div>
+        <label asp-for="Bio"></label>
+        <textarea asp-for="Bio"></textarea>
+    </div>
+    <div>
+        <label asp-for="IsProfileVisible">Mostrar perfil público</label>
+        <input asp-for="IsProfileVisible" type="checkbox" />
+    </div>
+    <div>
+        <button type="submit">Registrar</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

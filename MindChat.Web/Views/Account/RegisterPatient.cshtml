@@ -1,0 +1,37 @@
+@model MindChat.Web.Models.Auth.RegisterPatientDto
+
+@{
+    ViewData["Title"] = "Registro Paciente";
+}
+
+<h2>Registro Paciente</h2>
+
+<form asp-action="RegisterPatient" method="post">
+    <div>
+        <label asp-for="FullName"></label>
+        <input asp-for="FullName" />
+        <span asp-validation-for="FullName"></span>
+    </div>
+    <div>
+        <label asp-for="Email"></label>
+        <input asp-for="Email" />
+        <span asp-validation-for="Email"></span>
+    </div>
+    <div>
+        <label asp-for="Password"></label>
+        <input asp-for="Password" type="password" />
+        <span asp-validation-for="Password"></span>
+    </div>
+    <div>
+        <label asp-for="EmotionalState"></label>
+        <input asp-for="EmotionalState" />
+        <span asp-validation-for="EmotionalState"></span>
+    </div>
+    <div>
+        <button type="submit">Registrar</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

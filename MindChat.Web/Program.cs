@@ -3,6 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using MindChat.Domain.Entities;
 using MindChat.Infrastructure.Data;
 using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using MindChat.Web.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 Env.Load();
@@ -49,10 +53,42 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
+// JWT Authentication
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var jwtKey = jwtSection["Key"];
+if (string.IsNullOrEmpty(jwtKey))
+{
+    // If no key set, try environment variable
+    jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+}
+
+builder.Services.AddSingleton<IJwtService, JwtService>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = true;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSection["Issuer"],
+        ValidAudience = jwtSection["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey ?? string.Empty))
+    };
+});
+
 // 4. Configurar AutoMapper
 //builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
 
-// 5. Agregar servicios de aplicación (descomentar cuando los crees)
+// 5. Agregar servicios de aplicaciï¿½n (descomentar cuando los crees)
 // builder.Services.AddScoped<IPatientService, PatientService>();
 // builder.Services.AddScoped<IPsychologistService, PsychologistService>();
 // builder.Services.AddScoped<IAppointmentService, AppointmentService>();
@@ -71,15 +107,40 @@ using (var scope = app.Services.CreateScope())
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole<int>>>();
 
-        context.Database.Migrate();
+        var skipMigrations = Environment.GetEnvironmentVariable("SKIP_MIGRATIONS");
+        if (string.IsNullOrEmpty(skipMigrations) || skipMigrations != "1")
+        {
+            try
+            {
+                context.Database.Migrate();
+            }
+            catch (Exception migEx)
+            {
+                var logger = services.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning(migEx, "Se produjo un error al aplicar migraciones automÃ¡ticas. Saltando migraciones automÃ¡ticas.");
+            }
 
-        await SeedRoles(roleManager);
+            try
+            {
+                await SeedRoles(roleManager);
+            }
+            catch (Exception seedEx)
+            {
+                var logger = services.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning(seedEx, "Se produjo un error al ejecutar el seed de roles.");
+            }
+        }
+        else
+        {
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("SKIP_MIGRATIONS=1 detectado: se omiten migraciones automÃ¡ticas en el arranque.");
+        }
 
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Ocurrió un error durante la migración o seed de datos.");
+        logger.LogError(ex, "Ocurriï¿½ un error durante la migraciï¿½n o seed de datos.");
     }
 }
 
