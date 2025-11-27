@@ -8,11 +8,14 @@ namespace MindChat.Application.Interfaces
     public interface IPatientService
     {
         Task<(bool Success, IEnumerable<string> Errors)> RegisterAsync(RegisterPatientDto dto);
-
-        // Devuelve chats relacionados con el usuario (asumiendo que se usa UserId para resolver Patient)
         Task<IEnumerable<Chat>> GetChatsAsync(int userId);
-
-        // Devuelve todos los psicólogos cuyo perfil está visible
         Task<IEnumerable<Psychologist>> GetVisiblePsychologistsAsync();
+        Task<IEnumerable<Chat>> GetActiveChatNotificationsAsync(int userId);
+        
+        // Nuevos métodos para solicitudes de chat
+        Task<(bool Success, int SessionRequestId, string Error)> CreateChatRequestAsync(int patientUserId, int psychologistId, string initialMessage);
+        
+        // Método para verificar si existe un chat activo entre paciente y psicólogo
+        Task<(bool Success, bool HasActiveChat, string Error)> CheckExistingChatAsync(int patientUserId, int psychologistId);
     }
 }

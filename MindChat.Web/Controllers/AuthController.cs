@@ -60,6 +60,12 @@ public class AuthController : Controller
         }
 
         var roles = await _authService.GetRolesAsync(user);
+        if (!roles.Contains(UserRole.Patient.ToString()))
+        {
+            ModelState.AddModelError("", "No tiene permisos para acceder como paciente.");
+            return View();
+        }
+
         var token = _tokenService.GenerateToken(user, UserRole.Patient.ToString(), roles);
 
         HttpContext.Session.SetString("JWT", token);
@@ -94,6 +100,12 @@ public class AuthController : Controller
         }
 
         var roles = await _authService.GetRolesAsync(user);
+        if (!roles.Contains(UserRole.Psychologist.ToString()))
+        {
+            ModelState.AddModelError("", "No tiene permisos para acceder como psicólogo.");
+            return View();
+        }
+
         var token = _tokenService.GenerateToken(user, UserRole.Psychologist.ToString(), roles);
 
         HttpContext.Session.SetString("JWT", token);

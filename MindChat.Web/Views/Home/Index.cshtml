@@ -7,24 +7,84 @@
     var chats = ViewData["Chats"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
     var psychologists = ViewData["Psychologists"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
     var appointments = ViewData["Appointments"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var pendingRequests = ViewData["PendingRequests"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
     var currentChatId = ViewData["ChatId"] ?? 1;
+    var userId = (int)(ViewData["UserId"] ?? 0);
+    var hasBothProfiles = (bool)(ViewData["HasBothProfiles"] ?? false);
+    var isProfileVisible = (bool)(ViewData["IsProfileVisible"] ?? false);
 }
 
 <div>
     <div>
         <h2>Bienvenido, @userName</h2>
 
+        @* Botón "Ocultar perfil" solo para psicólogos *@
+        @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+        {
+            <form method="post" asp-action="ToggleProfileVisibility" asp-controller="Home">
+                @Html.AntiForgeryToken()
+                <button type="submit">
+                    @(isProfileVisible ? "Ocultar perfil" : "Mostrar perfil")
+                </button>
+            </form>
+        }
+
         <form method="post" asp-action="Logout">
             @Html.AntiForgeryToken()
             <button type="submit">Cerrar sesión</button>
         </form>
 
-        <form method="post" asp-action="SwitchProfile">
-            @Html.AntiForgeryToken()
-            <button type="submit">
-                Cambiar a @(activeProfile == "Patient" ? "Psicólogo" : "Paciente")
-            </button>
-        </form>
+        @* Botón "Cambiar perfil" solo para usuarios con ambos perfiles *@
+        @if (hasBothProfiles)
+        {
+            <form method="post" asp-action="SwitchProfile">
+                @Html.AntiForgeryToken()
+                <button type="submit">
+                    Cambiar a @(activeProfile == "Patient" ? "Psicólogo" : "Paciente")
+                </button>
+            </form>
+        }
+    </div>
+
+    <!-- Sección: Notificaciones -->
+    <div>
+        <h3>Notificaciones</h3>
+        <div id="notifications-container">
+            @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+            {
+                @if (!pendingRequests.Any())
+                {
+                    <p>No tienes solicitudes de chat pendientes.</p>
+                }
+                else
+                {
+                    <div id="pending-requests">
+                        @foreach (var request in pendingRequests)
+                        {
+                            <div class="notification-item" data-request-id="@request.Id">
+                                <h5>Solicitud de Chat</h5>
+                                <p><strong>Paciente:</strong> @(request.Patient?.User?.FullName ?? "Paciente")</p>
+                                <p><strong>Mensaje:</strong> @request.InitialMessage</p>
+                                <div>
+                                    <button type="button" class="btn-accept" data-request-id="@request.Id" 
+                                            >
+                                        Aceptar
+                                    </button>
+                                    <button type="button" class="btn-reject" data-request-id="@request.Id"
+                                            >
+                                        Rechazar
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <p>Las notificaciones de respuesta aparecerán aquí.</p>
+            }
+        </div>
     </div>
 
     <div>
@@ -33,6 +93,10 @@
             <h3>Perfil de Usuario</h3>
             <p>Nombre: @userName</p>
             <p>Perfil activo: @activeProfile</p>
+            @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+            {
+                <p>Estado del perfil: @(isProfileVisible ? "Visible para pacientes" : "Oculto para pacientes")</p>
+            }
         </div>
 
         <!-- Sección: Chats (siempre visible) -->
@@ -48,8 +112,8 @@
                     @foreach (var chat in chats)
                     {
                         var lastMessage = (chat.Messages != null && ((IEnumerable<dynamic>)chat.Messages).Any())
-                            ? ((IEnumerable<dynamic>)chat.Messages).Last().Message
-                            : "Sin mensajes";
+                        ? ((IEnumerable<dynamic>)chat.Messages).Last().Message
+                        : "Sin mensajes";
                         <li>
                             <strong>Chat #@chat.Id</strong>
                             <div>@lastMessage</div>
@@ -81,9 +145,36 @@
                                         <div>@psy.Bio</div>
                                     }
                                     <div>
-                                        <!-- Botón "chateat" (puedes enlazar a la acción que inicie/recupere el chat) -->
-                                        <button type="button" class="start-chat-btn" data-psychologist-id="@psy.Id">chateat</button>
+                                        <form method="post" asp-action="Create" asp-controller="SessionRequest" style="display: inline;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="psychologistId" value="@psy.Id" />
+                                            <button type="submit" class="start-chat-btn">Solicitar chat</button>
+                                        </form>
                                     </div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                <h3>Mis Citas</h3>
+                @if (!appointments.Any())
+                {
+                    <p>No tienes citas programadas.</p>
+                }
+                else
+                {
+                    <ul>
+                        @foreach (var appt in appointments.Where(a => a.PatientId == userId))
+                        {
+                            var psychologistName = appt.Psychologist?.User?.FullName ?? "Psicólogo";
+                            <li>
+                                <div>
+                                    <strong>@psychologistName</strong> - @((DateTime)appt.ScheduledAt).ToString("g")
+                                    @if (!string.IsNullOrEmpty(appt.Notes))
+                                    {
+                                        <div>@appt.Notes</div>
+                                    }
                                 </div>
                             </li>
                         }
@@ -91,9 +182,9 @@
                 }
             </div>
         }
-        <!-- Si el perfil activo es Psychologist: listar citas -->
         else if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
         {
+            <!-- Si el perfil activo es Psychologist: listar citas -->
             <div>
                 <h3>Mis Citas</h3>
                 @if (!appointments.Any())
@@ -135,9 +226,17 @@
 @section Scripts {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
     <script>
-        // inicia con el chat seleccionado por el servidor
-        let chatId = @currentChatId;
         const userName = "@userName";
+        const userId = "@userId";
+        
+        // Conexión para notificaciones
+        const notificationConnection = new signalR.HubConnectionBuilder()
+            .withUrl("/notificationhub")
+            .withAutomaticReconnect()
+            .build();
+
+        // Conexión para chat (existente)
+        let chatId = @currentChatId;
         const statusDiv = document.getElementById("connectionStatus");
         const messagesDiv = document.getElementById("messages");
 
@@ -146,57 +245,147 @@
             .withAutomaticReconnect()
             .build();
 
-        function showStatus(message) { statusDiv.textContent = message; }
+        function showStatus(message) { 
+            if (statusDiv) statusDiv.textContent = message; 
+        }
 
-        connection.on("ReceiveMessage", (chatIdReceived, message, sender) => {
-            if (chatIdReceived === chatId) {
-                messagesDiv.innerHTML += `<div><strong>${sender}:</strong> ${message}</div>`;
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        // Manejar notificaciones de solicitudes de chat
+        notificationConnection.on("ReceiveChatRequest", (data) => {
+            const container = document.getElementById("notifications-container");
+            const newNotification = document.createElement("div");
+            newNotification.className = "notification-item";
+            newNotification.setAttribute("data-request-id", data.SessionRequestId);
+            newNotification.style.cssText = "margin-bottom: 15px; padding: 15px; border: 2px solid #007bff; border-radius: 8px; background-color: #f8f9fa;";
+            
+            newNotification.innerHTML = `
+                <h5>Nueva Solicitud de Chat</h5>
+                <p><strong>Paciente:</strong> ${data.PatientName}</p>
+                <p><strong>Mensaje:</strong> ${data.InitialMessage}</p>
+                <div>
+                    <button type="button" class="btn-accept" data-request-id="${data.SessionRequestId}" 
+                            style="background-color: #28a745; color: white; border: none; padding: 8px 16px; margin-right: 10px; border-radius: 4px; cursor: pointer;">
+                        Aceptar
+                    </button>
+                    <button type="button" class="btn-reject" data-request-id="${data.SessionRequestId}"
+                            style="background-color: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        Rechazar
+                    </button>
+                </div>
+            `;
+            
+            container.prepend(newNotification);
+        });
+
+        // Manejar respuestas a solicitudes de chat
+        notificationConnection.on("ReceiveChatRequestResponse", (data) => {
+            const container = document.getElementById("notifications-container");
+            const responseNotification = document.createElement("div");
+            responseNotification.style.cssText = "margin-bottom: 15px; padding: 15px; border: 2px solid " + (data.Accepted ? "#28a745" : "#dc3545") + "; border-radius: 8px; background-color: #f8f9fa;";
+            
+            responseNotification.innerHTML = `
+                <h5>${data.Accepted ? 'Solicitud Aceptada' : 'Solicitud Rechazada'}</h5>
+                <p><strong>Psicólogo:</strong> ${data.PsychologistName}</p>
+                <p>${data.Accepted ? 'Tu solicitud de chat ha sido aceptada. Puedes comenzar a chatear.' : 'Tu solicitud de chat ha sido rechazada.'}</p>
+            `;
+            
+            container.prepend(responseNotification);
+        });
+
+        // Iniciar conexión de notificaciones
+        notificationConnection.start()
+            .then(() => {
+                console.log("Conexión de notificaciones iniciada");
+                notificationConnection.invoke("JoinUserGroup", userId);
+            })
+            .catch(err => console.error("Error al conectar notificaciones:", err));
+
+        // Manejar clics en botones de aceptar/rechazar
+        document.addEventListener("click", function(e) {
+            if (e.target.classList.contains("btn-accept")) {
+                const requestId = e.target.getAttribute("data-request-id");
+                handleSessionRequest(requestId, "Accept", e.target.closest(".notification-item"));
+            } else if (e.target.classList.contains("btn-reject")) {
+                const requestId = e.target.getAttribute("data-request-id");
+                handleSessionRequest(requestId, "Reject", e.target.closest(".notification-item"));
             }
         });
 
-        connection.onreconnecting(() => showStatus("Reconectando..."));
-        connection.onreconnected(() => {
-            showStatus("Reconectado");
-            connection.invoke("JoinChat", chatId);
-        });
-        connection.onclose(() => {
-            showStatus("Conexión perdida. Recargando...");
-            setTimeout(() => location.reload(), 2000);
-        });
+        function handleSessionRequest(requestId, action, notificationElement) {
+            fetch(`/SessionRequest/${action}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "RequestVerificationToken": document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: `sessionRequestId=${requestId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    notificationElement.style.opacity = "0.5";
+                    notificationElement.innerHTML = `
+                        <h5>Solicitud ${action === "Accept" ? "Aceptada" : "Rechazada"}</h5>
+                        <p>La solicitud ha sido procesada correctamente.</p>
+                    `;
+                    
+                    setTimeout(() => {
+                        notificationElement.remove();
+                    }, 3000);
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                alert("Error al procesar la solicitud");
+            });
+        }
 
-        connection.start()
-            .then(() => connection.invoke("JoinChat", chatId).then(() => showStatus("Conectado")))
-            .catch(() => { showStatus("Error al conectar. Recargando..."); setTimeout(() => location.reload(), 2000); });
+        // Resto del código de chat existente...
+        if (connection) {
+            connection.on("ReceiveMessage", (chatIdReceived, message, sender) => {
+                if (chatIdReceived === chatId && messagesDiv) {
+                    messagesDiv.innerHTML += `<div><strong>${sender}:</strong> ${message}</div>`;
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+            });
+
+            connection.onreconnecting(() => showStatus("Reconectando..."));
+            connection.onreconnected(() => {
+                showStatus("Reconectado");
+                connection.invoke("JoinChat", chatId);
+            });
+            connection.onclose(() => {
+                showStatus("Conexión perdida. Recargando...");
+                setTimeout(() => location.reload(), 2000);
+            });
+
+            connection.start()
+                .then(() => connection.invoke("JoinChat", chatId).then(() => showStatus("Conectado")))
+                .catch(() => { showStatus("Error al conectar. Recargando..."); setTimeout(() => location.reload(), 2000); });
+        }
 
         function sendMessage() {
             const input = document.getElementById("messageInput");
-            const message = input.value.trim();
-            if (message) {
+            const message = input?.value?.trim();
+            if (message && connection) {
                 connection.invoke("SendMessage", chatId, message, userName)
                     .then(() => input.value = "")
                     .catch(() => showStatus("Error al enviar mensaje"));
             }
         }
 
-        document.getElementById("sendBtn").addEventListener("click", sendMessage);
-        document.getElementById("messageInput").addEventListener("keypress", e => {
+        document.getElementById("sendBtn")?.addEventListener("click", sendMessage);
+        document.getElementById("messageInput")?.addEventListener("keypress", e => {
             if (e.key === 'Enter') { sendMessage(); e.preventDefault(); }
         });
 
-        // Handler para botones "chateat" (puedes llamar a una acción que cree/abra el chat desde el servidor)
-        document.querySelectorAll(".start-chat-btn").forEach(btn => {
-            btn.addEventListener("click", () => {
-                const psyId = btn.getAttribute("data-psychologist-id");
-                // placeholder: redirigir a la ruta que inicia/recupera un chat con el psicólogo
-                // por ejemplo: /SessionRequest/Create?psychologistId=...
-                window.location.href = `/SessionRequest/Create?psychologistId=${psyId}`;
-            });
-        });
-
         window.addEventListener("beforeunload", () => {
-            if (connection.state === signalR.HubConnectionState.Connected) {
+            if (connection && connection.state === signalR.HubConnectionState.Connected) {
                 connection.invoke("LeaveChat", chatId);
+            }
+            if (notificationConnection && notificationConnection.state === signalR.HubConnectionState.Connected) {
+                notificationConnection.invoke("LeaveUserGroup", userId);
             }
         });
     </script>

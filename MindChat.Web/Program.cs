@@ -10,6 +10,7 @@ using MindChat.Domain.Entities;
 using MindChat.Infrastructure.Data;
 using MindChat.Infrastructure.Seed;
 using MindChat.Web.Hubs;
+using MindChat.Web.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,8 +73,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = "Identity.Application";
+    options.DefaultChallengeScheme = "Identity.Application";
 })
 .AddJwtBearer(options =>
 {
@@ -87,6 +88,21 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtAudience,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
     };
+
+    // Configure JWT for SignalR
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationhub"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.Configure<EmailSettings>(options =>
@@ -98,17 +114,18 @@ builder.Services.Configure<EmailSettings>(options =>
     options.Password = emailPassword;
 });
 
-// 4. Configurar AutoMapper
+// AutoMapper
 builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
 
-// 5. Agregar servicios de aplicación
+// Application services
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IPsychologistService, PsychologistService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<INotificationService, MindChat.Web.Services.NotificationService>();
 
-// 6. Agregar logging con más detalle
+// Logging
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
@@ -116,7 +133,12 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
-builder.Services.AddSignalR();
+
+// SignalR configuration with authentication
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+});
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options => { options.IdleTimeout = TimeSpan.FromMinutes(30); });
@@ -174,6 +196,7 @@ app.MapControllerRoute(
     pattern: "{controller=Auth}/{action=LoginPatient}/{id?}");
 
 app.MapHub<ChatHub>("/chathub");
+app.MapHub<NotificationHub>("/notificationhub");
 
 app.MapRazorPages();
 

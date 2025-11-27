@@ -133,5 +133,118 @@ namespace MindChat.Application.Services
                 return Enumerable.Empty<Psychologist>();
             }
         }
+
+        // Devuelve chats activos (no cerrados) para mostrar en notificaciones
+        public async Task<IEnumerable<Chat>> GetActiveChatNotificationsAsync(int userId)
+        {
+            try
+            {
+                var patient = await _context.Patients
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UserId == userId);
+
+                if (patient == null)
+                {
+                    _logger.LogWarning("No se encontró Patient para UserId {UserId}", userId);
+                    return Enumerable.Empty<Chat>();
+                }
+
+                // Obtener chats que no están cerrados y tienen mensajes
+                var activeChats = await _context.Chats
+                    .AsNoTracking()
+                    .Include(c => c.SessionRequest)
+                        .ThenInclude(sr => sr.AssignedPsychologist)
+                            .ThenInclude(ps => ps.User)
+                    .Include(c => c.Messages.OrderByDescending(m => m.SentAt).Take(1))
+                    .Where(c => c.SessionRequest.PatientId == patient.Id && 
+                               !c.IsClosed && 
+                               c.SessionRequest.Status == SessionRequestStatus.Accepted)
+                    .OrderByDescending(c => c.Messages.Any() ? c.Messages.Max(m => m.SentAt) : DateTime.MinValue)
+                    .ToListAsync();
+
+                return activeChats;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener notificaciones de chat para UserId {UserId}", userId);
+                return Enumerable.Empty<Chat>();
+            }
+        }
+
+        // Crear solicitud de chat
+        public async Task<(bool Success, int SessionRequestId, string Error)> CreateChatRequestAsync(int patientUserId, int psychologistId, string initialMessage)
+        {
+            try
+            {
+                var patient = await _context.Patients
+                    .FirstOrDefaultAsync(p => p.UserId == patientUserId);
+
+                if (patient == null)
+                    return (false, 0, "Paciente no encontrado");
+
+                var psychologist = await _context.Psychologists
+                    .FirstOrDefaultAsync(p => p.Id == psychologistId);
+
+                if (psychologist == null || !psychologist.IsProfileVisible)
+                    return (false, 0, "Psicólogo no disponible");
+
+                // Verificar si ya existe una solicitud pendiente
+                var existingRequest = await _context.SessionRequests
+                    .FirstOrDefaultAsync(sr => sr.PatientId == patient.Id && 
+                                          sr.AssignedPsychologistId == psychologistId && 
+                                          sr.Status == SessionRequestStatus.Pending);
+
+                if (existingRequest != null)
+                    return (false, 0, "Ya tienes una solicitud pendiente con este psicólogo");
+
+                var sessionRequest = new SessionRequest
+                {
+                    PatientId = patient.Id,
+                    AssignedPsychologistId = psychologistId,
+                    Status = SessionRequestStatus.Pending,
+                    InitialMessage = initialMessage
+                };
+
+                _context.SessionRequests.Add(sessionRequest);
+                await _context.SaveChangesAsync();
+
+                return (true, sessionRequest.Id, "");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al crear solicitud de chat");
+                return (false, 0, "Error interno del servidor");
+            }
+        }
+
+        // Nuevo método: Verificar si existe un chat activo entre paciente y psicólogo
+        public async Task<(bool Success, bool HasActiveChat, string Error)> CheckExistingChatAsync(int patientUserId, int psychologistId)
+        {
+            try
+            {
+                var patient = await _context.Patients
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UserId == patientUserId);
+
+                if (patient == null)
+                    return (false, false, "Paciente no encontrado");
+
+                // Verificar si existe un chat activo (no cerrado) entre el paciente y el psicólogo
+                var activeChat = await _context.Chats
+                    .AsNoTracking()
+                    .Include(c => c.SessionRequest)
+                    .FirstOrDefaultAsync(c => c.SessionRequest.PatientId == patient.Id &&
+                                            c.SessionRequest.AssignedPsychologistId == psychologistId &&
+                                            c.SessionRequest.Status == SessionRequestStatus.Accepted &&
+                                            !c.IsClosed);
+
+                return (true, activeChat != null, "");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al verificar chat existente para patient {PatientUserId} y psychologist {PsychologistId}", patientUserId, psychologistId);
+                return (false, false, "Error interno del servidor");
+            }
+        }
     }
 }

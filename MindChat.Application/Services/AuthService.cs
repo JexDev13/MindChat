@@ -38,7 +38,10 @@ namespace MindChat.Application.Services
 
         public async Task<ApplicationUser?> FindByIdAsync(int userId)
         {
-            return await _userManager.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            return await _userManager.Users
+                .Include(u => u.PatientProfile)
+                .Include(u => u.PsychologistProfile)
+                .FirstOrDefaultAsync(u => u.Id == userId);
         }
 
         public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password)

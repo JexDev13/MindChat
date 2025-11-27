@@ -75,9 +75,14 @@ namespace MindChat.Web.Controllers
                 if (user == null)
                     return NotFound("No existe el usuario");
 
+                // Verificar si el usuario tiene ambos perfiles
+                bool hasBothProfiles = user.PatientProfile != null && user.PsychologistProfile != null;
+                bool isProfileVisible = user.PsychologistProfile?.IsProfileVisible ?? false;
+
                 IEnumerable<Chat> chats = Enumerable.Empty<Chat>();
                 IEnumerable<Psychologist> visiblePsychologists = Enumerable.Empty<Psychologist>();
                 IEnumerable<Appointment> appointments = Enumerable.Empty<Appointment>();
+                IEnumerable<SessionRequest> pendingRequests = Enumerable.Empty<SessionRequest>();
 
                 if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
                 {
@@ -89,12 +94,17 @@ namespace MindChat.Web.Controllers
                 {
                     chats = await _psychologistService.GetChatsAsync(userIdInt);
                     appointments = await _psychologistService.GetAppointmentsAsync(userIdInt);
+                    pendingRequests = await _psychologistService.GetPendingSessionRequestsAsync(userIdInt);
                     ViewData["Appointments"] = appointments;
+                    ViewData["PendingRequests"] = pendingRequests;
                 }
 
                 ViewData["UserName"] = user.FullName;
                 ViewData["ActiveProfile"] = activeProfile;
                 ViewData["Chats"] = chats;
+                ViewData["UserId"] = userIdInt;
+                ViewData["HasBothProfiles"] = hasBothProfiles;
+                ViewData["IsProfileVisible"] = isProfileVisible;
 
                 return View();
             }
@@ -113,6 +123,37 @@ namespace MindChat.Web.Controllers
             var newProfile = currentProfile == "Patient" ? "Psychologist" : "Patient";
             HttpContext.Session.SetString("ActiveProfile", newProfile);
             return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleProfileVisibility()
+        {
+            var jwt = HttpContext.Session.GetString("JWT");
+            if (string.IsNullOrEmpty(jwt))
+            {
+                return RedirectToAction("LoginPatient", "Auth");
+            }
+
+            try
+            {
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var jwtToken = tokenHandler.ReadJwtToken(jwt);
+                var userId = jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+
+                if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out var userIdInt))
+                {
+                    return RedirectToAction("LoginPatient", "Auth");
+                }
+
+                await _psychologistService.ToggleProfileVisibilityAsync(userIdInt);
+                return RedirectToAction("Index");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al cambiar la visibilidad del perfil.");
+                return RedirectToAction("Index");
+            }
         }
 
         [HttpPost]
