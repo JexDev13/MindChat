@@ -36,7 +36,6 @@ public class AuthController : Controller
     [HttpGet] public IActionResult LoginPatient() => View();
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> LoginPatient(string username, string password)
     {
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
@@ -76,7 +75,6 @@ public class AuthController : Controller
     [HttpGet] public IActionResult LoginPsychologist() => View();
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> LoginPsychologist(string username, string password)
     {
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
@@ -117,7 +115,6 @@ public class AuthController : Controller
     public IActionResult RegisterPatient() => View();
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> RegisterPatient([FromForm] RegisterPatientDto dto)
     {
         if (!ModelState.IsValid)
@@ -139,7 +136,6 @@ public class AuthController : Controller
     public IActionResult RegisterPsychologist() => View();
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> RegisterPsychologist(RegisterPsychologistDto dto)
     {
         if (!ModelState.IsValid) return View(dto);
@@ -157,7 +153,6 @@ public class AuthController : Controller
     [HttpGet] public IActionResult ForgotPassword() => View();
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
     {
         if (!ModelState.IsValid)
@@ -200,7 +195,6 @@ public class AuthController : Controller
     [HttpGet] public IActionResult ResetPasswordConfirmation() => View();
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
     {
         if (!ModelState.IsValid)

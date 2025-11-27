@@ -27,22 +27,31 @@ export default function ChatPage() {
  }, [chatId]);
 
  async function send() {
- if (!connection || !input) return;
- await connection.invoke("SendMessage", chatId, input, "Tú");
+ if (!connection || !input.trim()) return;
+ await connection.invoke("SendMessage", chatId, input.trim(), "Tu");
  setInput("");
  }
 
  return (
- <main className="p-6">
+ <main className="p-6 max-w-4xl mx-auto">
  <h1 className="text-2xl font-semibold mb-4">Chat</h1>
  <div className="space-y-2 mb-4">
  {messages.map((m, i) => (
  <div key={i} className="text-sm text-zinc-200">{m}</div>
  ))}
  </div>
- <div className="flex gap-2">
- <input className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-3 py-2" value={input} onChange={e => setInput(e.target.value)} />
- <button onClick={send} className="bg-brand-600 px-4 rounded">Enviar</button>
+ <div className="flex items-center gap-2">
+ <div className="flex-1 relative">
+ <input
+ className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 pr-12 text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-600"
+ value={input}
+ onChange={(e) => setInput(e.target.value)}
+ placeholder="Escribe un mensaje..."
+ onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); send(); } }}
+ />
+ <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-zinc-400 text-xs">Enter</div>
+ </div>
+ <button onClick={send} className="bg-gradient-to-r from-brand-600 to-sky-600 hover:from-brand-500 hover:to-sky-500 rounded-lg px-4 py-2">Enviar</button>
  </div>
  </main>
  );

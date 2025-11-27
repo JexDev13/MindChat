@@ -1,5 +1,6 @@
 /***************************************************
  * Next.js config with proxy rewrites to the .NET backend
+ * For dev, target http://localhost:5297 so antiforgery cookies work over HTTP
  ***************************************************/
 
 /** @type {import('next').NextConfig} */
@@ -8,15 +9,15 @@ const nextConfig = {
  return [
  {
  source: '/backend/:path*',
- destination: 'https://localhost:7217/:path*',
+ destination: 'http://localhost:5297/:path*',
  },
  {
  source: '/chathub',
- destination: 'https://localhost:7217/chathub',
+ destination: 'http://localhost:5297/chathub',
  },
  {
  source: '/notificationhub',
- destination: 'https://localhost:7217/notificationhub',
+ destination: 'http://localhost:5297/notificationhub',
  },
  ]
  },
