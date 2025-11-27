@@ -2,6 +2,7 @@
     ViewData["Title"] = "MindChat";
     Layout = "~/Views/Shared/_Layout.cshtml";
 
+    // ... (Variables de Razor) ...
     var activeProfile = (ViewData["ActiveProfile"] as string ?? "Patient");
     var userName = ViewData["UserName"] as string ?? "";
     var chats = ViewData["Chats"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
@@ -14,99 +15,106 @@
     var isProfileVisible = (bool)(ViewData["IsProfileVisible"] ?? false);
 }
 
-<div>
-    <div>
-        <h2>Bienvenido, @userName</h2>
+<div class="home-container">
 
-        @* Botón "Ocultar perfil" solo para psicólogos *@
-        @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
-        {
-            <form method="post" asp-action="ToggleProfileVisibility" asp-controller="Home">
-                @Html.AntiForgeryToken()
-                <button type="submit">
-                    @(isProfileVisible ? "Ocultar perfil" : "Mostrar perfil")
-                </button>
-            </form>
-        }
+    <div class="main-panels">
 
-        <form method="post" asp-action="Logout">
-            @Html.AntiForgeryToken()
-            <button type="submit">Cerrar sesión</button>
-        </form>
+        <div class="top-actions">
+            <h2 class="h4 mb-0 me-auto">
+                Bienvenido,
+                <span class="text-info d-inline-block text-truncate" style="max-width: 150px;">
+                    @userName
+                </span>
+            </h2>
 
-        @* Botón "Cambiar perfil" solo para usuarios con ambos perfiles *@
-        @if (hasBothProfiles)
-        {
-            <form method="post" asp-action="SwitchProfile">
-                @Html.AntiForgeryToken()
-                <button type="submit">
-                    Cambiar a @(activeProfile == "Patient" ? "Psicólogo" : "Paciente")
-                </button>
-            </form>
-        }
-    </div>
-
-    <!-- Sección: Notificaciones -->
-    <div>
-        <h3>Notificaciones</h3>
-        <div id="notifications-container">
+            @* Botones de acción superior *@
             @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
             {
-                @if (!pendingRequests.Any())
-                {
-                    <p>No tienes solicitudes de chat pendientes.</p>
-                }
-                else
-                {
-                    <div id="pending-requests">
-                        @foreach (var request in pendingRequests)
+                <form method="post" asp-action="ToggleProfileVisibility" asp-controller="Home" class="d-inline-block">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-eye"></i> @(isProfileVisible ? "Ocultar perfil" : "Mostrar perfil")
+                    </button>
+                </form>
+            }
+
+            @if (hasBothProfiles)
+            {
+                <form method="post" asp-action="SwitchProfile" class="d-inline-block">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-outline-light">
+                        Cambiar a @(activeProfile == "Patient" ? "Psicólogo" : "Paciente")
+                    </button>
+                </form>
+            }
+
+            <form method="post" asp-action="Logout" class="d-inline-block">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-danger">
+                    <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+                </button>
+            </form>
+        </div>
+
+        <div class="row">
+            <div class="col-12 col-md-6">
+                <div class="panel-section mb-3">
+                    <h3 class="h5">Perfil de Usuario</h3>
+                    <p class="mb-1"><strong>Nombre:</strong> @userName</p>
+                    <p class="mb-1"><strong>Perfil activo:</strong> <span class="badge bg-primary">@activeProfile</span></p>
+                    @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <p class="mb-0"><strong>Estado:</strong> <span class="badge @(isProfileVisible ? "bg-success" : "bg-warning text-dark")">@(isProfileVisible ? "Visible" : "Oculto")</span></p>
+                    }
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <div class="panel-section mb-3">
+                    <h3 class="h5">Notificaciones (@(pendingRequests.Count()) nuevas)</h3>
+                    <div id="notifications-container" style="max-height: 200px; overflow-y: auto;">
+                        @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
                         {
-                            <div class="notification-item" data-request-id="@request.Id">
-                                <h5>Solicitud de Chat</h5>
-                                <p><strong>Paciente:</strong> @(request.Patient?.User?.FullName ?? "Paciente")</p>
-                                <p><strong>Mensaje:</strong> @request.InitialMessage</p>
-                                <div>
-                                    <button type="button" class="btn-accept" data-request-id="@request.Id">
-                                        Aceptar
-                                    </button>
-                                    <button type="button" class="btn-reject" data-request-id="@request.Id">
-                                        Rechazar
-                                    </button>
+                            @if (!pendingRequests.Any())
+                            {
+                                <p class="text-secondary">No tienes solicitudes de chat pendientes.</p>
+                            }
+                            else
+                            {
+                                <div id="pending-requests">
+                                    @foreach (var request in pendingRequests)
+                                    {
+                                        <div class="notification-item" data-request-id="@request.Id">
+                                            <h5 class="mt-0">Solicitud de Chat</h5>
+                                            <p class="mb-1"><strong>Paciente:</strong> @(request.Patient?.User?.FullName ?? "Paciente")</p>
+                                            <p class="text-truncate mb-2" style="max-width: 100%;"><strong>Mensaje:</strong> @request.InitialMessage</p>
+                                            <div class="d-flex justify-content-end">
+                                                <button type="button" class="btn-accept me-2" data-request-id="@request.Id">Aceptar</button>
+                                                <button type="button" class="btn-reject" data-request-id="@request.Id">Rechazar</button>
+                                            </div>
+                                        </div>
+                                    }
                                 </div>
-                            </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-secondary">Las notificaciones de respuesta aparecerán aquí.</p>
                         }
                     </div>
-                }
-            }
-            else
-            {
-                <p>Las notificaciones de respuesta aparecerán aquí.</p>
-            }
-        </div>
-    </div>
-
-    <div>
-        <!-- Sección: User Profile -->
-        <div>
-            <h3>Perfil de Usuario</h3>
-            <p>Nombre: @userName</p>
-            <p>Perfil activo: @activeProfile</p>
-            @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
-            {
-                <p>Estado del perfil: @(isProfileVisible ? "Visible para pacientes" : "Oculto para pacientes")</p>
-            }
+                </div>
+            </div>
         </div>
 
-        <!-- Sección: Lista de Chats -->
-        <div>
-            <h3>Chats</h3>
+        <div class="panel-section">
+            <h3 class="h5">Chats Activos</h3>
             @if (!chats.Any())
             {
-                <p>No hay chats disponibles.</p>
+                <p class="text-secondary">No hay chats disponibles.</p>
             }
             else
             {
-                <div class="chats-list">
+                <div class="chats-list" style="max-height: 350px; overflow-y: auto;">
                     @foreach (var chat in chats)
                     {
                         string personName = "";
@@ -125,69 +133,66 @@
 
                         <div class="chat-item">
                             <div>
-                                <div>
-                                    <h4>@personName</h4>
-                                    <p><strong>Último mensaje:</strong> @(lastMessage.Length > 50 ? lastMessage.Substring(0, 50) + "..." : lastMessage)</p>
-                                </div>
-                                <button type="button"
-                                        class="btn-chat"
-                                        data-chat-id="@chat.Id"
-                                        data-person-name="@personName">
-                                    Chatear
-                                </button>
+                                <h4 class="h6 mb-1 text-light">@personName</h4>
+                                <p class="text-secondary mb-0 small text-truncate" style="max-width: 250px;">
+                                    @(lastMessage.Length > 40 ? lastMessage.Substring(0, 40) + "..." : lastMessage)
+                                </p>
                             </div>
+                            <button type="button" class="btn-chat" data-chat-id="@chat.Id" data-person-name="@personName">
+                                Chatear
+                            </button>
                         </div>
                     }
                 </div>
             }
         </div>
 
-        <!-- Sección: Mis Citas (para ambos perfiles) -->
-        <div>
+        <div class="panel-section">
             <div class="appointments-header">
-                <h3>Mis Citas</h3>
+                <h3 class="h5 mb-0">Mis Citas</h3>
                 @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
                 {
-                    <button type="button" id="search-appointments-btn" class="search-btn">Buscar Citas</button>
+                    <button type="button" id="search-appointments-btn" class="btn btn-sm btn-outline-info search-btn">
+                        <i class="bi bi-search"></i> Buscar Citas
+                    </button>
                 }
             </div>
 
             <div id="appointments-list">
                 @if (!appointments.Any())
                 {
-                    <p>No tienes citas programadas.</p>
+                    <p class="text-secondary mt-3">No tienes citas programadas.</p>
                 }
                 else
                 {
-                    <ul id="appointments-ul">
+                    <ul id="appointments-ul" style="max-height: 250px; overflow-y: auto;">
                         @foreach (var appt in appointments)
                         {
                             string personName = "";
                             if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
                             {
-                                // Para pacientes, mostrar el nombre del psicólogo
                                 personName = appt.Psychologist?.User?.FullName ?? "Psicólogo";
                             }
                             else
                             {
-                                // Para psicólogos, mostrar el nombre del paciente
                                 personName = appt.Patient?.User?.FullName ?? "Paciente";
                             }
 
                             <li data-appointment-id="@appt.Id">
                                 <div class="appointment-item">
                                     <div class="appointment-info">
-                                        <strong>@personName</strong> - @appt.ScheduledAt.ToString("g")
+                                        <strong class="text-warning">@personName</strong> -
+                                        <span class="text-info">@appt.ScheduledAt.ToString("g")</span>
                                         @if (!string.IsNullOrEmpty(appt.Notes))
                                         {
-                                            <div>@appt.Notes</div>
+                                            <div class="small text-secondary">Nota: @appt.Notes</div>
                                         }
                                     </div>
                                     @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
                                     {
                                         <div class="appointment-actions">
-                                            <button type="button" class="edit-appointment-btn" data-appointment-id="@appt.Id">Editar</button>
-                                            <button type="button" class="delete-appointment-btn" data-appointment-id="@appt.Id">Eliminar</button>
+                                            <button type="button" class="btn btn-sm btn-outline-warning edit-appointment-btn" data-appointment-id="@appt.Id">Editar</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger delete-appointment-btn" data-appointment-id="@appt.Id">Eliminar</button>
                                         </div>
                                     }
                                 </div>
@@ -198,34 +203,34 @@
             </div>
         </div>
 
-        <!-- Si el perfil activo es Patient: listar psicólogos visibles -->
+
         @if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
         {
-            <div>
-                <h3>Psicólogos Disponibles</h3>
+            <div class="panel-section psychologists-list">
+                <h3 class="h5">Psicólogos Disponibles</h3>
                 @if (!psychologists.Any())
                 {
-                    <p>No hay psicólogos visibles en este momento.</p>
+                    <p class="text-secondary">No hay psicólogos visibles en este momento.</p>
                 }
                 else
                 {
-                    <ul>
+                    <ul style="max-height: 350px; overflow-y: auto;">
                         @foreach (var psy in psychologists)
                         {
-                            <li>
+                            <li class="psychologist-item">
                                 <div>
-                                    <strong>@(psy.User?.FullName ?? "Psicólogo")</strong>
+                                    <strong class="text-success">@(psy.User?.FullName ?? "Psicólogo")</strong>
                                     @if (!string.IsNullOrEmpty(psy.Bio))
                                     {
-                                        <div>@psy.Bio</div>
+                                        <div class="small text-secondary text-truncate" style="max-width: 250px;">@psy.Bio</div>
                                     }
-                                    <div>
-                                        <form method="post" asp-action="Create" asp-controller="SessionRequest">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="psychologistId" value="@psy.Id" />
-                                            <button type="submit" class="start-chat-btn">Solicitar chat</button>
-                                        </form>
-                                    </div>
+                                </div>
+                                <div>
+                                    <form method="post" asp-action="Create" asp-controller="SessionRequest" class="m-0">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="psychologistId" value="@psy.Id" />
+                                        <button type="submit" class="start-chat-btn btn btn-sm">Solicitar chat</button>
+                                    </form>
                                 </div>
                             </li>
                         }
@@ -233,59 +238,62 @@
                 }
             </div>
         }
+    </div>
 
-        <!-- Container para múltiples secciones de chat -->
-        <div id="chat-sections-container"></div>
-
-        <!-- Modal para agendar cita -->
-        <div id="appointment-modal" class="modal">
-            <div class="modal-content">
-                <h4 id="appointment-modal-title">Agendar Nueva Cita</h4>
-                <form id="appointment-form">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" id="appointment-chat-id" />
-                    <input type="hidden" id="appointment-id" />
-                    <div>
-                        <label for="appointment-date">Fecha y Hora:</label>
-                        <input type="datetime-local" id="appointment-date" required />
-                    </div>
-                    <div>
-                        <label for="appointment-notes">Notas (opcional):</label>
-                        <textarea id="appointment-notes" rows="3" placeholder="Escriba notas adicionales para la cita..."></textarea>
-                    </div>
-                    <div class="modal-buttons">
-                        <button type="submit" class="btn-save" id="save-appointment-btn">Agendar Cita</button>
-                        <button type="button" class="btn-cancel">Cancelar</button>
-                    </div>
-                </form>
-            </div>
+    <div id="chat-sections-container">
+        <div class="alert alert-info text-center">
+            Haz clic en "Chatear" en la lista de Chats Activos para abrir una ventana de chat aquí.
         </div>
+    </div>
+</div>
 
-        <!-- Modal para buscar citas -->
-        <div id="search-modal" class="modal">
-            <div class="modal-content">
-                <h4>Buscar Citas</h4>
-                <form id="search-form">
-                    <div>
-                        <label for="search-patient-name">Nombre del Paciente:</label>
-                        <input type="text" id="search-patient-name" placeholder="Buscar por nombre..." />
-                    </div>
-                    <div>
-                        <label for="search-from-date">Desde:</label>
-                        <input type="date" id="search-from-date" />
-                    </div>
-                    <div>
-                        <label for="search-to-date">Hasta:</label>
-                        <input type="date" id="search-to-date" />
-                    </div>
-                    <div class="modal-buttons">
-                        <button type="submit" class="btn-search">Buscar</button>
-                        <button type="button" class="btn-clear">Limpiar Filtros</button>
-                        <button type="button" class="btn-cancel">Cancelar</button>
-                    </div>
-                </form>
+@* Mantenemos los modales fuera del grid principal pero dentro del body *@
+
+<div id="appointment-modal" class="modal">
+    <div class="modal-content card">
+        <h4 id="appointment-modal-title" class="text-center">Agendar Nueva Cita</h4>
+        <form id="appointment-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="appointment-chat-id" />
+            <input type="hidden" id="appointment-id" />
+            <div class="mb-3">
+                <label for="appointment-date" class="form-label">Fecha y Hora:</label>
+                <input type="datetime-local" id="appointment-date" class="form-control" required />
             </div>
-        </div>
+            <div class="mb-3">
+                <label for="appointment-notes" class="form-label">Notas (opcional):</label>
+                <textarea id="appointment-notes" rows="3" placeholder="Escriba notas adicionales para la cita..." class="form-control"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button type="submit" class="btn-save" id="save-appointment-btn">Agendar Cita</button>
+                <button type="button" class="btn-cancel">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="search-modal" class="modal">
+    <div class="modal-content card">
+        <h4 class="text-center">Buscar Citas</h4>
+        <form id="search-form">
+            <div class="mb-3">
+                <label for="search-patient-name" class="form-label">Nombre del Paciente:</label>
+                <input type="text" id="search-patient-name" placeholder="Buscar por nombre..." class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label for="search-from-date" class="form-label">Desde:</label>
+                <input type="date" id="search-from-date" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label for="search-to-date" class="form-label">Hasta:</label>
+                <input type="date" id="search-to-date" class="form-control" />
+            </div>
+            <div class="modal-buttons">
+                <button type="submit" class="btn-search">Buscar</button>
+                <button type="button" class="btn-clear">Limpiar Filtros</button>
+                <button type="button" class="btn-cancel">Cancelar</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -850,85 +858,4 @@
             }
         });
     </script>
-
-    <style>
-        /* Estilos básicos para el modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 15% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 80%;
-            max-width: 500px;
-        }
-
-            .modal-content h4 {
-                margin-top: 0;
-            }
-
-            .modal-content div {
-                margin-bottom: 15px;
-            }
-
-            .modal-content label {
-                display: block;
-                margin-bottom: 5px;
-                font-weight: bold;
-            }
-
-            .modal-content input,
-            .modal-content textarea {
-                width: 100%;
-                padding: 8px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-            }
-
-        .modal-buttons {
-            text-align: right;
-        }
-
-            .modal-buttons button {
-                margin-left: 10px;
-                padding: 8px 16px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-            }
-
-        .btn-save {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .btn-cancel {
-            background-color: #6c757d;
-            color: white;
-        }
-
-        .chat-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .schedule-appointment-btn {
-            background-color: #17a2b8;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-    </style>
 }
