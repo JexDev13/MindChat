@@ -17,5 +17,8 @@ namespace MindChat.Application.Interfaces
         
         // Método para verificar si existe un chat activo entre paciente y psicólogo
         Task<(bool Success, bool HasActiveChat, string Error)> CheckExistingChatAsync(int patientUserId, int psychologistId);
+        
+        // Nuevo método para obtener las citas del paciente
+        Task<IEnumerable<Appointment>> GetAppointmentsAsync(int userId);
     }
 }

@@ -88,6 +88,7 @@ namespace MindChat.Web.Controllers
                 {
                     chats = await _patientService.GetChatsAsync(userIdInt);
                     visiblePsychologists = await _patientService.GetVisiblePsychologistsAsync();
+                    appointments = await _patientService.GetAppointmentsAsync(userIdInt); // Agregar citas para pacientes
                     ViewData["Psychologists"] = visiblePsychologists;
                 }
                 else if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
@@ -95,13 +96,13 @@ namespace MindChat.Web.Controllers
                     chats = await _psychologistService.GetChatsAsync(userIdInt);
                     appointments = await _psychologistService.GetAppointmentsAsync(userIdInt);
                     pendingRequests = await _psychologistService.GetPendingSessionRequestsAsync(userIdInt);
-                    ViewData["Appointments"] = appointments;
                     ViewData["PendingRequests"] = pendingRequests;
                 }
 
                 ViewData["UserName"] = user.FullName;
                 ViewData["ActiveProfile"] = activeProfile;
                 ViewData["Chats"] = chats;
+                ViewData["Appointments"] = appointments; // Ahora las citas se pasan para ambos perfiles
                 ViewData["UserId"] = userIdInt;
                 ViewData["HasBothProfiles"] = hasBothProfiles;
                 ViewData["IsProfileVisible"] = isProfileVisible;

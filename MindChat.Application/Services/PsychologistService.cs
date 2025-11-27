@@ -336,5 +336,60 @@ namespace MindChat.Application.Services
                 return null;
             }
         }
+
+        // Nuevo método: Crear cita desde chat
+        public async Task<(bool Success, string Error)> CreateAppointmentFromChatAsync(int psychologistUserId, int chatId, DateTime scheduledAt, string notes)
+        {
+            try
+            {
+                var psychologist = await _context.Psychologists
+                    .FirstOrDefaultAsync(p => p.UserId == psychologistUserId);
+
+                if (psychologist == null)
+                    return (false, "Psicólogo no encontrado");
+
+                // Obtener el chat con la información del paciente
+                var chat = await _context.Chats
+                    .Include(c => c.SessionRequest)
+                        .ThenInclude(sr => sr.Patient)
+                    .FirstOrDefaultAsync(c => c.Id == chatId && 
+                                            c.SessionRequest.AssignedPsychologistId == psychologist.Id);
+
+                if (chat == null)
+                    return (false, "Chat no encontrado o no pertenece a este psicólogo");
+
+                // Verificar que la fecha sea futura
+                if (scheduledAt <= DateTime.Now)
+                    return (false, "La fecha de la cita debe ser futura");
+
+                // Verificar si ya existe una cita en el mismo horario para el psicólogo
+                var conflictingAppointment = await _context.Appointments
+                    .FirstOrDefaultAsync(a => a.PsychologistId == psychologist.Id && 
+                                            a.ScheduledAt == scheduledAt && 
+                                            !a.IsCancelled);
+
+                if (conflictingAppointment != null)
+                    return (false, "Ya tienes una cita programada en ese horario");
+
+                // Crear la nueva cita
+                var appointment = new Appointment
+                {
+                    PsychologistId = psychologist.Id,
+                    PatientId = chat.SessionRequest.Patient.Id,
+                    ScheduledAt = scheduledAt,
+                    Notes = notes ?? "",
+                    IsCancelled = false
+                };
+
+                _context.Appointments.Add(appointment);
+                await _context.SaveChangesAsync();
+
+                return (true, "");
+            }
+            catch (Exception)
+            {
+                return (false, "Error interno del servidor");
+            }
+        }
     }
 }

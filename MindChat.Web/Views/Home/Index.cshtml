@@ -66,12 +66,10 @@
                                 <p><strong>Paciente:</strong> @(request.Patient?.User?.FullName ?? "Paciente")</p>
                                 <p><strong>Mensaje:</strong> @request.InitialMessage</p>
                                 <div>
-                                    <button type="button" class="btn-accept" data-request-id="@request.Id" 
-                                            >
+                                    <button type="button" class="btn-accept" data-request-id="@request.Id">
                                         Aceptar
                                     </button>
-                                    <button type="button" class="btn-reject" data-request-id="@request.Id"
-                                            >
+                                    <button type="button" class="btn-reject" data-request-id="@request.Id">
                                         Rechazar
                                     </button>
                                 </div>
@@ -88,7 +86,7 @@
     </div>
 
     <div>
-        <!-- Sección: User Profile (siempre visible) -->
+        <!-- Sección: User Profile -->
         <div>
             <h3>Perfil de Usuario</h3>
             <p>Nombre: @userName</p>
@@ -99,7 +97,7 @@
             }
         </div>
 
-        <!-- Sección: Chats (siempre visible) -->
+        <!-- Sección: Lista de Chats -->
         <div>
             <h3>Chats</h3>
             @if (!chats.Any())
@@ -108,15 +106,74 @@
             }
             else
             {
-                <ul>
+                <div class="chats-list">
                     @foreach (var chat in chats)
                     {
+                        string personName = "";
+                        if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+                        {
+                            personName = chat.SessionRequest?.AssignedPsychologist?.User?.FullName ?? "Psicólogo";
+                        }
+                        else
+                        {
+                            personName = chat.SessionRequest?.Patient?.User?.FullName ?? "Paciente";
+                        }
+
                         var lastMessage = (chat.Messages != null && ((IEnumerable<dynamic>)chat.Messages).Any())
                         ? ((IEnumerable<dynamic>)chat.Messages).Last().Message
                         : "Sin mensajes";
+
+                        <div class="chat-item">
+                            <div>
+                                <div>
+                                    <h4>@personName</h4>
+                                    <p><strong>Último mensaje:</strong> @(lastMessage.Length > 50 ? lastMessage.Substring(0, 50) + "..." : lastMessage)</p>
+                                </div>
+                                <button type="button"
+                                        class="btn-chat"
+                                        data-chat-id="@chat.Id"
+                                        data-person-name="@personName">
+                                    Chatear
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Sección: Mis Citas (para ambos perfiles) -->
+        <div>
+            <h3>Mis Citas</h3>
+            @if (!appointments.Any())
+            {
+                <p>No tienes citas programadas.</p>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var appt in appointments)
+                    {
+                        string personName = "";
+                        if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Para pacientes, mostrar el nombre del psicólogo
+                            personName = appt.Psychologist?.User?.FullName ?? "Psicólogo";
+                        }
+                        else
+                        {
+                            // Para psicólogos, mostrar el nombre del paciente
+                            personName = appt.Patient?.User?.FullName ?? "Paciente";
+                        }
+                        
                         <li>
-                            <strong>Chat #@chat.Id</strong>
-                            <div>@lastMessage</div>
+                            <div>
+                                <strong>@personName</strong> - @appt.ScheduledAt.ToString("g")
+                                @if (!string.IsNullOrEmpty(appt.Notes))
+                                {
+                                    <div>@appt.Notes</div>
+                                }
+                            </div>
                         </li>
                     }
                 </ul>
@@ -145,7 +202,7 @@
                                         <div>@psy.Bio</div>
                                     }
                                     <div>
-                                        <form method="post" asp-action="Create" asp-controller="SessionRequest" style="display: inline;">
+                                        <form method="post" asp-action="Create" asp-controller="SessionRequest">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="psychologistId" value="@psy.Id" />
                                             <button type="submit" class="start-chat-btn">Solicitar chat</button>
@@ -156,69 +213,33 @@
                         }
                     </ul>
                 }
-
-                <h3>Mis Citas</h3>
-                @if (!appointments.Any())
-                {
-                    <p>No tienes citas programadas.</p>
-                }
-                else
-                {
-                    <ul>
-                        @foreach (var appt in appointments.Where(a => a.PatientId == userId))
-                        {
-                            var psychologistName = appt.Psychologist?.User?.FullName ?? "Psicólogo";
-                            <li>
-                                <div>
-                                    <strong>@psychologistName</strong> - @((DateTime)appt.ScheduledAt).ToString("g")
-                                    @if (!string.IsNullOrEmpty(appt.Notes))
-                                    {
-                                        <div>@appt.Notes</div>
-                                    }
-                                </div>
-                            </li>
-                        }
-                    </ul>
-                }
-            </div>
-        }
-        else if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
-        {
-            <!-- Si el perfil activo es Psychologist: listar citas -->
-            <div>
-                <h3>Mis Citas</h3>
-                @if (!appointments.Any())
-                {
-                    <p>No hay citas programadas.</p>
-                }
-                else
-                {
-                    <ul>
-                        @foreach (var appt in appointments)
-                        {
-                            var patientName = appt.Patient?.User?.FullName ?? "Paciente";
-                            <li>
-                                <div>
-                                    <strong>@patientName</strong> - @((DateTime)appt.ScheduledAt).ToString("g")
-                                    @if (!string.IsNullOrEmpty(appt.Notes))
-                                    {
-                                        <div>@appt.Notes</div>
-                                    }
-                                </div>
-                            </li>
-                        }
-                    </ul>
-                }
             </div>
         }
 
-        <!-- Sección: Chat Web -->
-        <div>
-            <h3>Chat</h3>
-            <div id="messages"></div>
-            <input type="text" id="messageInput" placeholder="Escribe un mensaje..." />
-            <button id="sendBtn">Enviar</button>
-            <div id="connectionStatus"></div>
+        <!-- Container para múltiples secciones de chat -->
+        <div id="chat-sections-container"></div>
+
+        <!-- Modal para agendar cita -->
+        <div id="appointment-modal" class="modal">
+            <div class="modal-content">
+                <h4>Agendar Nueva Cita</h4>
+                <form id="appointment-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="appointment-chat-id" />
+                    <div>
+                        <label for="appointment-date">Fecha y Hora:</label>
+                        <input type="datetime-local" id="appointment-date" required />
+                    </div>
+                    <div>
+                        <label for="appointment-notes">Notas (opcional):</label>
+                        <textarea id="appointment-notes" rows="3" placeholder="Escriba notas adicionales para la cita..."></textarea>
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-save">Agendar Cita</button>
+                        <button type="button" class="btn-cancel">Cancelar</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -228,87 +249,268 @@
     <script>
         const userName = "@userName";
         const userId = "@userId";
-        
-        // Conexión para notificaciones
+        const activeProfile = "@activeProfile";
+
         const notificationConnection = new signalR.HubConnectionBuilder()
             .withUrl("/notificationhub")
             .withAutomaticReconnect()
             .build();
 
-        // Conexión para chat (existente)
-        let chatId = @currentChatId;
-        const statusDiv = document.getElementById("connectionStatus");
-        const messagesDiv = document.getElementById("messages");
+        // Objetos para gestionar múltiples chats
+        const activeChats = new Map(); // chatId -> { element, connection, isConnected }
+        const chatSectionsContainer = document.getElementById("chat-sections-container");
+        const appointmentModal = document.getElementById("appointment-modal");
 
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/chathub")
             .withAutomaticReconnect()
             .build();
 
-        function showStatus(message) { 
-            if (statusDiv) statusDiv.textContent = message; 
+        function createChatSection(chatId, personName) {
+            const chatSection = document.createElement("div");
+            chatSection.className = "chat-section";
+            chatSection.id = `chat-section-${chatId}`;
+
+            // Agregar botón "Agendar cita" solo para psicólogos
+            const appointmentButton = activeProfile === "Psychologist"
+                ? `<button type="button" class="schedule-appointment-btn" data-chat-id="${chatId}">Agendar cita</button>`
+                : '';
+
+            chatSection.innerHTML = `
+                <div class="chat-header">
+                    <h3>Chat con ${personName}</h3>
+                    <div class="chat-actions">
+                        ${appointmentButton}
+                        <button type="button" class="close-chat-btn" data-chat-id="${chatId}">Cerrar Chat</button>
+                    </div>
+                </div>
+                <div class="messages" id="messages-${chatId}"></div>
+                <div class="chat-input">
+                    <input type="text" class="message-input" id="messageInput-${chatId}" placeholder="Escribe un mensaje..." />
+                    <button class="send-btn" data-chat-id="${chatId}">Enviar</button>
+                </div>
+                <div class="connection-status" id="connectionStatus-${chatId}"></div>
+            `;
+
+            return chatSection;
         }
 
-        // Manejar notificaciones de solicitudes de chat
+        function showStatus(chatId, message) {
+            const statusDiv = document.getElementById(`connectionStatus-${chatId}`);
+            if (statusDiv) statusDiv.textContent = message;
+        }
+
+        function openChat(selectedChatId, personName) {
+            // Si el chat ya está abierto, no hacer nada
+            if (activeChats.has(selectedChatId)) {
+                return;
+            }
+
+            // Crear nueva sección de chat
+            const chatSection = createChatSection(selectedChatId, personName);
+            chatSectionsContainer.appendChild(chatSection);
+
+            const messagesDiv = document.getElementById(`messages-${selectedChatId}`);
+            const messageInput = document.getElementById(`messageInput-${selectedChatId}`);
+
+            // Agregar event listener para el input de mensajes
+            messageInput.addEventListener("keypress", (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage(selectedChatId);
+                    e.preventDefault();
+                }
+            });
+
+            // Registrar el chat activo
+            activeChats.set(selectedChatId, {
+                element: chatSection,
+                messagesDiv: messagesDiv,
+                messageInput: messageInput,
+                isConnected: false
+            });
+
+            // Conectar al chat específico
+            if (connection.state === signalR.HubConnectionState.Connected) {
+                connection.invoke("JoinChat", selectedChatId)
+                    .then(() => {
+                        showStatus(selectedChatId, "Conectado al chat");
+                        activeChats.get(selectedChatId).isConnected = true;
+                    })
+                    .catch(err => showStatus(selectedChatId, "Error al unirse al chat"));
+            }
+        }
+
+        function closeChat(chatId) {
+            const chatInfo = activeChats.get(chatId);
+            if (!chatInfo) return;
+
+            // Desconectar del chat
+            if (chatInfo.isConnected) {
+                connection.invoke("LeaveChat", chatId);
+            }
+
+            // Remover el elemento del DOM
+            chatInfo.element.remove();
+
+            // Remover del mapa de chats activos
+            activeChats.delete(chatId);
+        }
+
+        function sendMessage(chatId) {
+            const chatInfo = activeChats.get(chatId);
+            if (!chatInfo) return;
+
+            const message = chatInfo.messageInput.value.trim();
+            if (message && connection && chatInfo.isConnected) {
+                connection.invoke("SendMessage", chatId, message, userName)
+                    .then(() => {
+                        chatInfo.messageInput.value = "";
+                    })
+                    .catch(() => showStatus(chatId, "Error al enviar mensaje"));
+            } else if (!chatInfo.isConnected) {
+                showStatus(chatId, "No conectado al chat");
+            }
+        }
+
+        // Funciones para manejar el modal de citas
+        function openAppointmentModal(chatId) {
+            document.getElementById("appointment-chat-id").value = chatId;
+
+            // Establecer fecha mínima como mañana
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(9, 0, 0, 0); // Establecer hora por defecto a las 9:00 AM
+
+            const dateInput = document.getElementById("appointment-date");
+            dateInput.min = new Date().toISOString().slice(0, 16);
+            dateInput.value = tomorrow.toISOString().slice(0, 16);
+
+            appointmentModal.style.display = "block";
+        }
+
+        function closeAppointmentModal() {
+            appointmentModal.style.display = "none";
+            document.getElementById("appointment-form").reset();
+        }
+
+        function scheduleAppointment() {
+            const chatId = document.getElementById("appointment-chat-id").value;
+            const scheduledAt = document.getElementById("appointment-date").value;
+            const notes = document.getElementById("appointment-notes").value;
+
+            if (!scheduledAt) {
+                alert("Por favor seleccione una fecha y hora para la cita");
+                return;
+            }
+
+            fetch('/Appointment/Create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: `chatId=${chatId}&scheduledAt=${encodeURIComponent(scheduledAt)}&notes=${encodeURIComponent(notes)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Cita agendada exitosamente");
+                    closeAppointmentModal();
+                    location.reload(); // Recargar para mostrar la nueva cita
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                alert("Error al agendar la cita");
+            });
+        }
+
+        document.addEventListener("click", function(e) {
+            if (e.target.classList.contains("btn-chat")) {
+                const selectedChatId = parseInt(e.target.getAttribute("data-chat-id"));
+                const personName = e.target.getAttribute("data-person-name");
+                openChat(selectedChatId, personName);
+            } else if (e.target.classList.contains("close-chat-btn")) {
+                const chatId = parseInt(e.target.getAttribute("data-chat-id"));
+                closeChat(chatId);
+            } else if (e.target.classList.contains("send-btn")) {
+                const chatId = parseInt(e.target.getAttribute("data-chat-id"));
+                sendMessage(chatId);
+            } else if (e.target.classList.contains("schedule-appointment-btn")) {
+                const chatId = parseInt(e.target.getAttribute("data-chat-id"));
+                openAppointmentModal(chatId);
+            } else if (e.target.classList.contains("btn-accept")) {
+                const requestId = e.target.getAttribute("data-request-id");
+                handleSessionRequest(requestId, "Accept", e.target.closest(".notification-item"));
+            } else if (e.target.classList.contains("btn-reject")) {
+                const requestId = e.target.getAttribute("data-request-id");
+                handleSessionRequest(requestId, "Reject", e.target.closest(".notification-item"));
+            } else if (e.target.classList.contains("btn-cancel")) {
+                closeAppointmentModal();
+            }
+        });
+
+        // Event listener para el formulario de citas
+        document.getElementById("appointment-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            scheduleAppointment();
+        });
+
+        // Cerrar modal si se hace clic fuera de él
+        window.addEventListener("click", function(e) {
+            if (e.target === appointmentModal) {
+                closeAppointmentModal();
+            }
+        });
+
         notificationConnection.on("ReceiveChatRequest", (data) => {
             const container = document.getElementById("notifications-container");
             const newNotification = document.createElement("div");
             newNotification.className = "notification-item";
             newNotification.setAttribute("data-request-id", data.SessionRequestId);
-            newNotification.style.cssText = "margin-bottom: 15px; padding: 15px; border: 2px solid #007bff; border-radius: 8px; background-color: #f8f9fa;";
-            
+
             newNotification.innerHTML = `
                 <h5>Nueva Solicitud de Chat</h5>
                 <p><strong>Paciente:</strong> ${data.PatientName}</p>
                 <p><strong>Mensaje:</strong> ${data.InitialMessage}</p>
                 <div>
-                    <button type="button" class="btn-accept" data-request-id="${data.SessionRequestId}" 
-                            style="background-color: #28a745; color: white; border: none; padding: 8px 16px; margin-right: 10px; border-radius: 4px; cursor: pointer;">
+                    <button type="button" class="btn-accept" data-request-id="${data.SessionRequestId}">
                         Aceptar
                     </button>
-                    <button type="button" class="btn-reject" data-request-id="${data.SessionRequestId}"
-                            style="background-color: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    <button type="button" class="btn-reject" data-request-id="${data.SessionRequestId}">
                         Rechazar
                     </button>
                 </div>
             `;
-            
+
             container.prepend(newNotification);
         });
 
-        // Manejar respuestas a solicitudes de chat
         notificationConnection.on("ReceiveChatRequestResponse", (data) => {
             const container = document.getElementById("notifications-container");
             const responseNotification = document.createElement("div");
-            responseNotification.style.cssText = "margin-bottom: 15px; padding: 15px; border: 2px solid " + (data.Accepted ? "#28a745" : "#dc3545") + "; border-radius: 8px; background-color: #f8f9fa;";
-            
+
             responseNotification.innerHTML = `
                 <h5>${data.Accepted ? 'Solicitud Aceptada' : 'Solicitud Rechazada'}</h5>
                 <p><strong>Psicólogo:</strong> ${data.PsychologistName}</p>
                 <p>${data.Accepted ? 'Tu solicitud de chat ha sido aceptada. Puedes comenzar a chatear.' : 'Tu solicitud de chat ha sido rechazada.'}</p>
             `;
-            
+
             container.prepend(responseNotification);
+
+            if (data.Accepted) {
+                setTimeout(() => location.reload(), 3000);
+            }
         });
 
-        // Iniciar conexión de notificaciones
         notificationConnection.start()
             .then(() => {
                 console.log("Conexión de notificaciones iniciada");
                 notificationConnection.invoke("JoinUserGroup", userId);
             })
             .catch(err => console.error("Error al conectar notificaciones:", err));
-
-        // Manejar clics en botones de aceptar/rechazar
-        document.addEventListener("click", function(e) {
-            if (e.target.classList.contains("btn-accept")) {
-                const requestId = e.target.getAttribute("data-request-id");
-                handleSessionRequest(requestId, "Accept", e.target.closest(".notification-item"));
-            } else if (e.target.classList.contains("btn-reject")) {
-                const requestId = e.target.getAttribute("data-request-id");
-                handleSessionRequest(requestId, "Reject", e.target.closest(".notification-item"));
-            }
-        });
 
         function handleSessionRequest(requestId, action, notificationElement) {
             fetch(`/SessionRequest/${action}`, {
@@ -322,14 +524,16 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    notificationElement.style.opacity = "0.5";
                     notificationElement.innerHTML = `
                         <h5>Solicitud ${action === "Accept" ? "Aceptada" : "Rechazada"}</h5>
                         <p>La solicitud ha sido procesada correctamente.</p>
                     `;
-                    
+
                     setTimeout(() => {
                         notificationElement.remove();
+                        if (action === "Accept") {
+                            location.reload();
+                        }
                     }, 3000);
                 } else {
                     alert("Error: " + data.error);
@@ -341,52 +545,139 @@
             });
         }
 
-        // Resto del código de chat existente...
         if (connection) {
             connection.on("ReceiveMessage", (chatIdReceived, message, sender) => {
-                if (chatIdReceived === chatId && messagesDiv) {
-                    messagesDiv.innerHTML += `<div><strong>${sender}:</strong> ${message}</div>`;
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                const chatInfo = activeChats.get(chatIdReceived);
+                if (chatInfo && chatInfo.isConnected) {
+                    chatInfo.messagesDiv.innerHTML += `<div><strong>${sender}:</strong> ${message}</div>`;
+                    chatInfo.messagesDiv.scrollTop = chatInfo.messagesDiv.scrollHeight;
                 }
             });
 
-            connection.onreconnecting(() => showStatus("Reconectando..."));
-            connection.onreconnected(() => {
-                showStatus("Reconectado");
-                connection.invoke("JoinChat", chatId);
+            connection.onreconnecting(() => {
+                activeChats.forEach((chatInfo, chatId) => {
+                    showStatus(chatId, "Reconectando...");
+                });
             });
+
+            connection.onreconnected(() => {
+                activeChats.forEach((chatInfo, chatId) => {
+                    showStatus(chatId, "Reconectado");
+                    if (chatInfo.isConnected) {
+                        connection.invoke("JoinChat", chatId);
+                    }
+                });
+            });
+
             connection.onclose(() => {
-                showStatus("Conexión perdida. Recargando...");
+                activeChats.forEach((chatInfo, chatId) => {
+                    showStatus(chatId, "Conexión perdida. Recargando...");
+                });
                 setTimeout(() => location.reload(), 2000);
             });
 
             connection.start()
-                .then(() => connection.invoke("JoinChat", chatId).then(() => showStatus("Conectado")))
-                .catch(() => { showStatus("Error al conectar. Recargando..."); setTimeout(() => location.reload(), 2000); });
+                .then(() => {
+                    console.log("Conectado al servidor");
+                })
+                .catch(() => {
+                    console.log("Error al conectar. Recargando...");
+                    setTimeout(() => location.reload(), 2000);
+                });
         }
-
-        function sendMessage() {
-            const input = document.getElementById("messageInput");
-            const message = input?.value?.trim();
-            if (message && connection) {
-                connection.invoke("SendMessage", chatId, message, userName)
-                    .then(() => input.value = "")
-                    .catch(() => showStatus("Error al enviar mensaje"));
-            }
-        }
-
-        document.getElementById("sendBtn")?.addEventListener("click", sendMessage);
-        document.getElementById("messageInput")?.addEventListener("keypress", e => {
-            if (e.key === 'Enter') { sendMessage(); e.preventDefault(); }
-        });
 
         window.addEventListener("beforeunload", () => {
             if (connection && connection.state === signalR.HubConnectionState.Connected) {
-                connection.invoke("LeaveChat", chatId);
+                activeChats.forEach((chatInfo, chatId) => {
+                    if (chatInfo.isConnected) {
+                        connection.invoke("LeaveChat", chatId);
+                    }
+                });
             }
             if (notificationConnection && notificationConnection.state === signalR.HubConnectionState.Connected) {
                 notificationConnection.invoke("LeaveUserGroup", userId);
             }
         });
     </script>
+
+    <style>
+        /* Estilos básicos para el modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+
+            .modal-content h4 {
+                margin-top: 0;
+            }
+
+            .modal-content div {
+                margin-bottom: 15px;
+            }
+
+            .modal-content label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+            }
+
+            .modal-content input,
+            .modal-content textarea {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+
+        .modal-buttons {
+            text-align: right;
+        }
+
+            .modal-buttons button {
+                margin-left: 10px;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+
+        .btn-save {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .schedule-appointment-btn {
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
 }

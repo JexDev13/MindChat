@@ -4,7 +4,6 @@ using MindChat.Domain.Entities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-
 namespace MindChat.Application.Interfaces
 {
     public interface IPsychologistService
@@ -23,5 +22,8 @@ namespace MindChat.Application.Interfaces
         
         // Método para obtener información de una solicitud de sesión
         Task<SessionRequestInfoDto?> GetSessionRequestInfoAsync(int sessionRequestId);
+        
+        // Nuevo método para crear citas desde chat
+        Task<(bool Success, string Error)> CreateAppointmentFromChatAsync(int psychologistUserId, int chatId, DateTime scheduledAt, string notes);
     }
 }

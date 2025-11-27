@@ -246,5 +246,39 @@ namespace MindChat.Application.Services
                 return (false, false, "Error interno del servidor");
             }
         }
+
+        // Nuevo método: Obtener citas del paciente
+        public async Task<IEnumerable<Appointment>> GetAppointmentsAsync(int userId)
+        {
+            try
+            {
+                // Resolve patient record by userId
+                var patient = await _context.Patients
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UserId == userId);
+
+                if (patient == null)
+                {
+                    _logger.LogWarning("No se encontró Patient para UserId {UserId}", userId);
+                    return Enumerable.Empty<Appointment>();
+                }
+
+                // Load non-cancelled appointments for this patient with psychologist info
+                var appointments = await _context.Appointments
+                    .AsNoTracking()
+                    .Include(a => a.Psychologist)
+                        .ThenInclude(ps => ps.User)
+                    .Where(a => a.PatientId == patient.Id && !a.IsCancelled)
+                    .OrderBy(a => a.ScheduledAt)
+                    .ToListAsync();
+
+                return appointments;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener citas para UserId {UserId}", userId);
+                return Enumerable.Empty<Appointment>();
+            }
+        }
     }
 }
