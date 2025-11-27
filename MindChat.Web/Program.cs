@@ -1,25 +1,47 @@
+using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using MindChat.Application.Configuration;
+using MindChat.Application.Interfaces;
+using MindChat.Application.Services;
 using MindChat.Domain.Entities;
 using MindChat.Infrastructure.Data;
-using DotNetEnv;
+using MindChat.Infrastructure.Seed;
+using MindChat.Web.Hubs;
+using MindChat.Web.Services;
+using System.Text;
+
 var builder = WebApplication.CreateBuilder(args);
 
 Env.Load();
+
+builder.Configuration.AddEnvironmentVariables();
 
 var dbServer = Environment.GetEnvironmentVariable("DB_SERVER");
 var dbName = Environment.GetEnvironmentVariable("DB_NAME");
 var dbUser = Environment.GetEnvironmentVariable("DB_USER");
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
 
+var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
+var jwtExpiry = Environment.GetEnvironmentVariable("JWT_EXPIRY");
+
+var emailSmtpHost = Environment.GetEnvironmentVariable("EMAIL_SMTP_HOST");
+var emailSmtpPort = Environment.GetEnvironmentVariable("EMAIL_SMTP_PORT");
+var emailSenderName = Environment.GetEnvironmentVariable("EMAIL_SENDER_NAME");
+var emailSenderEmail = Environment.GetEnvironmentVariable("EMAIL_SENDER_EMAIL");
+var emailPassword = Environment.GetEnvironmentVariable("EMAIL_PASSWORD");
+
 var connectionString =
-    $"Server={dbServer};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=False;";
+    $"Server={dbServer};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=True;";
+
+var infraAssembly = typeof(ApplicationDbContext).Assembly.FullName;
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(
-        connectionString,
-        b => b.MigrationsAssembly("MindChat.Infrastructure")
-    )
+    options.UseSqlServer(connectionString, b => b.MigrationsAssembly(infraAssembly))
 );
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<int>>(options =>
@@ -49,37 +71,99 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
-// 4. Configurar AutoMapper
-//builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = "Identity.Application";
+    options.DefaultChallengeScheme = "Identity.Application";
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+    };
 
-// 5. Agregar servicios de aplicación (descomentar cuando los crees)
-// builder.Services.AddScoped<IPatientService, PatientService>();
-// builder.Services.AddScoped<IPsychologistService, PsychologistService>();
-// builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+    // Configure JWT for SignalR
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/notificationhub"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
+});
+
+builder.Services.Configure<EmailSettings>(options =>
+{
+    options.SmtpHost = emailSmtpHost;
+    options.SmtpPort = int.Parse(emailSmtpPort ?? "587");
+    options.SenderName = emailSenderName;
+    options.SenderEmail = emailSenderEmail;
+    options.Password = emailPassword;
+});
+
+// AutoMapper
+builder.Services.AddAutoMapper(typeof(MindChat.Application.MappingProfiles.AutoMapperProfile));
+
+// Application services
+builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IPsychologistService, PsychologistService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IChatService, ChatService>(); // Agregado el servicio de chat
+builder.Services.AddScoped<INotificationService, MindChat.Web.Services.NotificationService>();
+
+// Logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+
+// SignalR configuration with authentication
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+});
+
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options => { options.IdleTimeout = TimeSpan.FromMinutes(30); });
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole<int>>>();
-
+        var logger = services.GetRequiredService<ILogger<Program>>();
         context.Database.Migrate();
-
-        await SeedRoles(roleManager);
-
+        await IdentitySeeder.SeedCoreAsync(roleManager);
+        await TagSeeder.SeedTagAsync(context, logger);
+        logger.LogInformation("Migración y seeding completados exitosamente.");
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Ocurrió un error durante la migración o seed de datos.");
+        logger.LogError(ex, "Ocurrió un error durante la migración o el seeding.");
     }
 }
 
@@ -98,26 +182,23 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    MinimumSameSitePolicy = SameSiteMode.Lax
+});
+
+app.UseSession();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern: "{controller=Auth}/{action=LoginPatient}/{id?}");
+
+app.MapHub<ChatHub>("/chathub");
+app.MapHub<NotificationHub>("/notificationhub");
 
 app.MapRazorPages();
 
 app.Run();
-
-static async Task SeedRoles(RoleManager<IdentityRole<int>> roleManager)
-{
-    string[] roleNames = { "Psychologist", "Patient" };
-
-    foreach (var roleName in roleNames)
-    {
-        if (!await roleManager.RoleExistsAsync(roleName))
-        {
-            await roleManager.CreateAsync(new IdentityRole<int>(roleName));
-        }
-    }
-}

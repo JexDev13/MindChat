@@ -1,14 +1,934 @@
 ﻿@{
-    ViewData["Title"] = "Test DB Connection";
+    ViewData["Title"] = "MindChat";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var activeProfile = (ViewData["ActiveProfile"] as string ?? "Patient");
+    var userName = ViewData["UserName"] as string ?? "";
+    var chats = ViewData["Chats"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var psychologists = ViewData["Psychologists"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var appointments = ViewData["Appointments"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var pendingRequests = ViewData["PendingRequests"] as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var currentChatId = ViewData["ChatId"] ?? 1;
+    var userId = (int)(ViewData["UserId"] ?? 0);
+    var hasBothProfiles = (bool)(ViewData["HasBothProfiles"] ?? false);
+    var isProfileVisible = (bool)(ViewData["IsProfileVisible"] ?? false);
 }
 
-<h2>Test DB Connection</h2>
+<div>
+    <div>
+        <h2>Bienvenido, @userName</h2>
 
-@if (ViewBag.Error != null)
-{
-    <p style="color:red">Error conectando a la base de datos: @ViewBag.Error</p>
-}
-else
-{
-    <p>Conexión exitosa! Número de pacientes en la base: @ViewBag.PatientCount</p>
+        @* Botón "Ocultar perfil" solo para psicólogos *@
+        @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+        {
+            <form method="post" asp-action="ToggleProfileVisibility" asp-controller="Home">
+                @Html.AntiForgeryToken()
+                <button type="submit">
+                    @(isProfileVisible ? "Ocultar perfil" : "Mostrar perfil")
+                </button>
+            </form>
+        }
+
+        <form method="post" asp-action="Logout">
+            @Html.AntiForgeryToken()
+            <button type="submit">Cerrar sesión</button>
+        </form>
+
+        @* Botón "Cambiar perfil" solo para usuarios con ambos perfiles *@
+        @if (hasBothProfiles)
+        {
+            <form method="post" asp-action="SwitchProfile">
+                @Html.AntiForgeryToken()
+                <button type="submit">
+                    Cambiar a @(activeProfile == "Patient" ? "Psicólogo" : "Paciente")
+                </button>
+            </form>
+        }
+    </div>
+
+    <!-- Sección: Notificaciones -->
+    <div>
+        <h3>Notificaciones</h3>
+        <div id="notifications-container">
+            @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+            {
+                @if (!pendingRequests.Any())
+                {
+                    <p>No tienes solicitudes de chat pendientes.</p>
+                }
+                else
+                {
+                    <div id="pending-requests">
+                        @foreach (var request in pendingRequests)
+                        {
+                            <div class="notification-item" data-request-id="@request.Id">
+                                <h5>Solicitud de Chat</h5>
+                                <p><strong>Paciente:</strong> @(request.Patient?.User?.FullName ?? "Paciente")</p>
+                                <p><strong>Mensaje:</strong> @request.InitialMessage</p>
+                                <div>
+                                    <button type="button" class="btn-accept" data-request-id="@request.Id">
+                                        Aceptar
+                                    </button>
+                                    <button type="button" class="btn-reject" data-request-id="@request.Id">
+                                        Rechazar
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <p>Las notificaciones de respuesta aparecerán aquí.</p>
+            }
+        </div>
+    </div>
+
+    <div>
+        <!-- Sección: User Profile -->
+        <div>
+            <h3>Perfil de Usuario</h3>
+            <p>Nombre: @userName</p>
+            <p>Perfil activo: @activeProfile</p>
+            @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+            {
+                <p>Estado del perfil: @(isProfileVisible ? "Visible para pacientes" : "Oculto para pacientes")</p>
+            }
+        </div>
+
+        <!-- Sección: Lista de Chats -->
+        <div>
+            <h3>Chats</h3>
+            @if (!chats.Any())
+            {
+                <p>No hay chats disponibles.</p>
+            }
+            else
+            {
+                <div class="chats-list">
+                    @foreach (var chat in chats)
+                    {
+                        string personName = "";
+                        if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+                        {
+                            personName = chat.SessionRequest?.AssignedPsychologist?.User?.FullName ?? "Psicólogo";
+                        }
+                        else
+                        {
+                            personName = chat.SessionRequest?.Patient?.User?.FullName ?? "Paciente";
+                        }
+
+                        var lastMessage = (chat.Messages != null && ((IEnumerable<dynamic>)chat.Messages).Any())
+                        ? ((IEnumerable<dynamic>)chat.Messages).Last().Message
+                        : "Sin mensajes";
+
+                        <div class="chat-item">
+                            <div>
+                                <div>
+                                    <h4>@personName</h4>
+                                    <p><strong>Último mensaje:</strong> @(lastMessage.Length > 50 ? lastMessage.Substring(0, 50) + "..." : lastMessage)</p>
+                                </div>
+                                <button type="button"
+                                        class="btn-chat"
+                                        data-chat-id="@chat.Id"
+                                        data-person-name="@personName">
+                                    Chatear
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Sección: Mis Citas (para ambos perfiles) -->
+        <div>
+            <div class="appointments-header">
+                <h3>Mis Citas</h3>
+                @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+                {
+                    <button type="button" id="search-appointments-btn" class="search-btn">Buscar Citas</button>
+                }
+            </div>
+
+            <div id="appointments-list">
+                @if (!appointments.Any())
+                {
+                    <p>No tienes citas programadas.</p>
+                }
+                else
+                {
+                    <ul id="appointments-ul">
+                        @foreach (var appt in appointments)
+                        {
+                            string personName = "";
+                            if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Para pacientes, mostrar el nombre del psicólogo
+                                personName = appt.Psychologist?.User?.FullName ?? "Psicólogo";
+                            }
+                            else
+                            {
+                                // Para psicólogos, mostrar el nombre del paciente
+                                personName = appt.Patient?.User?.FullName ?? "Paciente";
+                            }
+
+                            <li data-appointment-id="@appt.Id">
+                                <div class="appointment-item">
+                                    <div class="appointment-info">
+                                        <strong>@personName</strong> - @appt.ScheduledAt.ToString("g")
+                                        @if (!string.IsNullOrEmpty(appt.Notes))
+                                        {
+                                            <div>@appt.Notes</div>
+                                        }
+                                    </div>
+                                    @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <div class="appointment-actions">
+                                            <button type="button" class="edit-appointment-btn" data-appointment-id="@appt.Id">Editar</button>
+                                            <button type="button" class="delete-appointment-btn" data-appointment-id="@appt.Id">Eliminar</button>
+                                        </div>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+        <!-- Si el perfil activo es Patient: listar psicólogos visibles -->
+        @if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+        {
+            <div>
+                <h3>Psicólogos Disponibles</h3>
+                @if (!psychologists.Any())
+                {
+                    <p>No hay psicólogos visibles en este momento.</p>
+                }
+                else
+                {
+                    <ul>
+                        @foreach (var psy in psychologists)
+                        {
+                            <li>
+                                <div>
+                                    <strong>@(psy.User?.FullName ?? "Psicólogo")</strong>
+                                    @if (!string.IsNullOrEmpty(psy.Bio))
+                                    {
+                                        <div>@psy.Bio</div>
+                                    }
+                                    <div>
+                                        <form method="post" asp-action="Create" asp-controller="SessionRequest">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="psychologistId" value="@psy.Id" />
+                                            <button type="submit" class="start-chat-btn">Solicitar chat</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        <!-- Container para múltiples secciones de chat -->
+        <div id="chat-sections-container"></div>
+
+        <!-- Modal para agendar cita -->
+        <div id="appointment-modal" class="modal">
+            <div class="modal-content">
+                <h4 id="appointment-modal-title">Agendar Nueva Cita</h4>
+                <form id="appointment-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="appointment-chat-id" />
+                    <input type="hidden" id="appointment-id" />
+                    <div>
+                        <label for="appointment-date">Fecha y Hora:</label>
+                        <input type="datetime-local" id="appointment-date" required />
+                    </div>
+                    <div>
+                        <label for="appointment-notes">Notas (opcional):</label>
+                        <textarea id="appointment-notes" rows="3" placeholder="Escriba notas adicionales para la cita..."></textarea>
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-save" id="save-appointment-btn">Agendar Cita</button>
+                        <button type="button" class="btn-cancel">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal para buscar citas -->
+        <div id="search-modal" class="modal">
+            <div class="modal-content">
+                <h4>Buscar Citas</h4>
+                <form id="search-form">
+                    <div>
+                        <label for="search-patient-name">Nombre del Paciente:</label>
+                        <input type="text" id="search-patient-name" placeholder="Buscar por nombre..." />
+                    </div>
+                    <div>
+                        <label for="search-from-date">Desde:</label>
+                        <input type="date" id="search-from-date" />
+                    </div>
+                    <div>
+                        <label for="search-to-date">Hasta:</label>
+                        <input type="date" id="search-to-date" />
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-search">Buscar</button>
+                        <button type="button" class="btn-clear">Limpiar Filtros</button>
+                        <button type="button" class="btn-cancel">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
+    <script>
+        const userName = "@userName";
+        const userId = "@userId";
+        const activeProfile = "@activeProfile";
+
+        const notificationConnection = new signalR.HubConnectionBuilder()
+            .withUrl("/notificationhub")
+            .withAutomaticReconnect()
+            .build();
+
+        // Objetos para gestionar múltiples chats y modals
+        const activeChats = new Map(); // chatId -> { element, connection, isConnected }
+        const chatSectionsContainer = document.getElementById("chat-sections-container");
+        const appointmentModal = document.getElementById("appointment-modal");
+        const searchModal = document.getElementById("search-modal");
+        let isEditMode = false;
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/chathub")
+            .withAutomaticReconnect()
+            .build();
+
+        function createChatSection(chatId, personName) {
+            const chatSection = document.createElement("div");
+            chatSection.className = "chat-section";
+            chatSection.id = `chat-section-${chatId}`;
+
+            // Agregar botón "Agendar cita" solo para psicólogos
+            const appointmentButton = activeProfile === "Psychologist"
+                ? `<button type="button" class="schedule-appointment-btn" data-chat-id="${chatId}">Agendar cita</button>`
+                : '';
+
+            chatSection.innerHTML = `
+                <div class="chat-header">
+                    <h3>Chat con ${personName}</h3>
+                    <div class="chat-actions">
+                        ${appointmentButton}
+                        <button type="button" class="close-chat-btn" data-chat-id="${chatId}">Cerrar Chat</button>
+                    </div>
+                </div>
+                <div class="messages" id="messages-${chatId}"></div>
+                <div class="chat-input">
+                    <input type="text" class="message-input" id="messageInput-${chatId}" placeholder="Escribe un mensaje..." />
+                    <button class="send-btn" data-chat-id="${chatId}">Enviar</button>
+                </div>
+                <div class="connection-status" id="connectionStatus-${chatId}"></div>
+            `;
+
+            return chatSection;
+        }
+
+        function showStatus(chatId, message) {
+            const statusDiv = document.getElementById(`connectionStatus-${chatId}`);
+            if (statusDiv) statusDiv.textContent = message;
+        }
+
+        function openChat(selectedChatId, personName) {
+            // Si el chat ya está abierto, no hacer nada
+            if (activeChats.has(selectedChatId)) {
+                return;
+            }
+
+            // Crear nueva sección de chat
+            const chatSection = createChatSection(selectedChatId, personName);
+            chatSectionsContainer.appendChild(chatSection);
+
+            const messagesDiv = document.getElementById(`messages-${selectedChatId}`);
+            const messageInput = document.getElementById(`messageInput-${selectedChatId}`);
+
+            // Agregar event listener para el input de mensajes
+            messageInput.addEventListener("keypress", (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage(selectedChatId);
+                    e.preventDefault();
+                }
+            });
+
+            // Registrar el chat activo
+            activeChats.set(selectedChatId, {
+                element: chatSection,
+                messagesDiv: messagesDiv,
+                messageInput: messageInput,
+                isConnected: false
+            });
+
+            // Conectar al chat específico
+            if (connection.state === signalR.HubConnectionState.Connected) {
+                showStatus(selectedChatId, "Conectando al chat...");
+                connection.invoke("JoinChat", selectedChatId)
+                    .then(() => {
+                        showStatus(selectedChatId, "Conectado al chat");
+                        activeChats.get(selectedChatId).isConnected = true;
+                        console.log(`Conectado al chat ${selectedChatId}, esperando historial...`);
+                    })
+                    .catch(err => {
+                        console.error("Error al unirse al chat:", err);
+                        showStatus(selectedChatId, "Error al unirse al chat");
+                    });
+            } else {
+                showStatus(selectedChatId, "Esperando conexión...");
+            }
+        }
+
+        function closeChat(chatId) {
+            const chatInfo = activeChats.get(chatId);
+            if (!chatInfo) return;
+
+            // Desconectar del chat
+            if (chatInfo.isConnected) {
+                connection.invoke("LeaveChat", chatId);
+            }
+
+            // Remover el elemento del DOM
+            chatInfo.element.remove();
+
+            // Remover del mapa de chats activos
+            activeChats.delete(chatId);
+        }
+
+        function sendMessage(chatId) {
+            const chatInfo = activeChats.get(chatId);
+            if (!chatInfo) return;
+
+            const message = chatInfo.messageInput.value.trim();
+            if (message && connection && chatInfo.isConnected) {
+                connection.invoke("SendMessage", chatId, message, userName)
+                    .then(() => {
+                        chatInfo.messageInput.value = "";
+                    })
+                    .catch(() => showStatus(chatId, "Error al enviar mensaje"));
+            } else if (!chatInfo.isConnected) {
+                showStatus(chatId, "No conectado al chat");
+            }
+        }
+
+        // Funciones para manejar el modal de citas
+        function openAppointmentModal(chatId = null, appointmentId = null) {
+            isEditMode = appointmentId !== null;
+
+            document.getElementById("appointment-chat-id").value = chatId || '';
+            document.getElementById("appointment-id").value = appointmentId || '';
+
+            const title = document.getElementById("appointment-modal-title");
+            const saveBtn = document.getElementById("save-appointment-btn");
+
+            if (isEditMode) {
+                title.textContent = "Editar Cita";
+                saveBtn.textContent = "Actualizar Cita";
+
+                // Cargar datos de la cita
+                loadAppointmentData(appointmentId);
+            } else {
+                title.textContent = "Agendar Nueva Cita";
+                saveBtn.textContent = "Agendar Cita";
+
+                // Establecer fecha mínima como mañana
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(9, 0, 0, 0);
+
+                const dateInput = document.getElementById("appointment-date");
+                dateInput.min = new Date().toISOString().slice(0, 16);
+                dateInput.value = tomorrow.toISOString().slice(0, 16);
+            }
+
+            appointmentModal.style.display = "block";
+        }
+
+        function loadAppointmentData(appointmentId) {
+            fetch(`/Appointment/Get?appointmentId=${appointmentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById("appointment-date").value = data.appointment.scheduledAt;
+                        document.getElementById("appointment-notes").value = data.appointment.notes;
+                    } else {
+                        alert("Error al cargar los datos de la cita: " + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                    alert("Error al cargar los datos de la cita");
+                });
+        }
+
+        function closeAppointmentModal() {
+            appointmentModal.style.display = "none";
+            document.getElementById("appointment-form").reset();
+            isEditMode = false;
+        }
+
+        function scheduleOrUpdateAppointment() {
+            const chatId = document.getElementById("appointment-chat-id").value;
+            const appointmentId = document.getElementById("appointment-id").value;
+            const scheduledAt = document.getElementById("appointment-date").value;
+            const notes = document.getElementById("appointment-notes").value;
+
+            if (!scheduledAt) {
+                alert("Por favor seleccione una fecha y hora para la cita");
+                return;
+            }
+
+            const url = isEditMode ? '/Appointment/Update' : '/Appointment/Create';
+            let body = `scheduledAt=${encodeURIComponent(scheduledAt)}&notes=${encodeURIComponent(notes)}`;
+
+            if (isEditMode) {
+                body += `&appointmentId=${appointmentId}`;
+            } else {
+                body += `&chatId=${chatId}`;
+            }
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: body
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    closeAppointmentModal();
+                    location.reload();
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                alert("Error al procesar la cita");
+            });
+        }
+
+        function deleteAppointment(appointmentId) {
+            if (!confirm("¿Estás seguro de que deseas eliminar esta cita?")) {
+                return;
+            }
+
+            fetch('/Appointment/Delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: `appointmentId=${appointmentId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Remover la cita de la lista
+                    const appointmentItem = document.querySelector(`li[data-appointment-id="${appointmentId}"]`);
+                    if (appointmentItem) {
+                        appointmentItem.remove();
+                    }
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                alert("Error al eliminar la cita");
+            });
+        }
+
+        function openSearchModal() {
+            searchModal.style.display = "block";
+        }
+
+        function closeSearchModal() {
+            searchModal.style.display = "none";
+            document.getElementById("search-form").reset();
+        }
+
+        function searchAppointments() {
+            const patientName = document.getElementById("search-patient-name").value;
+            const fromDate = document.getElementById("search-from-date").value;
+            const toDate = document.getElementById("search-to-date").value;
+
+            let url = '/Appointment/Search?';
+            const params = [];
+
+            if (patientName) params.push(`patientName=${encodeURIComponent(patientName)}`);
+            if (fromDate) params.push(`fromDate=${encodeURIComponent(fromDate)}`);
+            if (toDate) params.push(`toDate=${encodeURIComponent(toDate)}`);
+
+            url += params.join('&');
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateAppointmentsList(data.appointments);
+                        closeSearchModal();
+                    } else {
+                        alert("Error en la búsqueda: " + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                    alert("Error al buscar citas");
+                });
+        }
+
+        function updateAppointmentsList(appointments) {
+            const appointmentsList = document.getElementById("appointments-ul");
+            appointmentsList.innerHTML = "";
+
+            if (appointments.length === 0) {
+                appointmentsList.innerHTML = '<li>No se encontraron citas que coincidan con los criterios de búsqueda.</li>';
+                return;
+            }
+
+            appointments.forEach(appt => {
+                const listItem = document.createElement("li");
+                listItem.setAttribute("data-appointment-id", appt.id);
+
+                listItem.innerHTML = `
+                    <div class="appointment-item">
+                        <div class="appointment-info">
+                            <strong>${appt.patientName}</strong> - ${appt.scheduledAtFormatted}
+                            ${appt.notes ? `<div>${appt.notes}</div>` : ''}
+                        </div>
+                        ${activeProfile === "Psychologist" ? `
+                        <div class="appointment-actions">
+                            <button type="button" class="edit-appointment-btn" data-appointment-id="${appt.id}">Editar</button>
+                            <button type="button" class="delete-appointment-btn" data-appointment-id="${appt.id}">Eliminar</button>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                appointmentsList.appendChild(listItem);
+            });
+        }
+
+        function clearSearchFilters() {
+            document.getElementById("search-form").reset();
+            location.reload(); // Recargar para mostrar todas las citas
+        }
+
+        document.addEventListener("click", function(e) {
+            if (e.target.classList.contains("btn-chat")) {
+                const selectedChatId = parseInt(e.target.getAttribute("data-chat-id"));
+                const personName = e.target.getAttribute("data-person-name");
+                openChat(selectedChatId, personName);
+            } else if (e.target.classList.contains("close-chat-btn")) {
+                const chatId = parseInt(e.target.getAttribute("data-chat-id"));
+                closeChat(chatId);
+            } else if (e.target.classList.contains("send-btn")) {
+                const chatId = parseInt(e.target.getAttribute("data-chat-id"));
+                sendMessage(chatId);
+            } else if (e.target.classList.contains("schedule-appointment-btn")) {
+                const chatId = parseInt(e.target.getAttribute("data-chat-id"));
+                openAppointmentModal(chatId);
+            } else if (e.target.classList.contains("edit-appointment-btn")) {
+                const appointmentId = parseInt(e.target.getAttribute("data-appointment-id"));
+                openAppointmentModal(null, appointmentId);
+            } else if (e.target.classList.contains("delete-appointment-btn")) {
+                const appointmentId = parseInt(e.target.getAttribute("data-appointment-id"));
+                deleteAppointment(appointmentId);
+            } else if (e.target.id === "search-appointments-btn") {
+                openSearchModal();
+            } else if (e.target.classList.contains("btn-accept")) {
+                const requestId = e.target.getAttribute("data-request-id");
+                handleSessionRequest(requestId, "Accept", e.target.closest(".notification-item"));
+            } else if (e.target.classList.contains("btn-reject")) {
+                const requestId = e.target.getAttribute("data-request-id");
+                handleSessionRequest(requestId, "Reject", e.target.closest(".notification-item"));
+            } else if (e.target.classList.contains("btn-cancel")) {
+                closeAppointmentModal();
+                closeSearchModal();
+            } else if (e.target.classList.contains("btn-search")) {
+                e.preventDefault();
+                searchAppointments();
+            } else if (e.target.classList.contains("btn-clear")) {
+                e.preventDefault();
+                clearSearchFilters();
+            }
+        });
+
+        // Event listener para el formulario de citas
+        document.getElementById("appointment-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            scheduleOrUpdateAppointment();
+        });
+
+        // Cerrar modals si se hace clic fuera de ellos
+        window.addEventListener("click", function(e) {
+            if (e.target === appointmentModal) {
+                closeAppointmentModal();
+            }
+            if (e.target === searchModal) {
+                closeSearchModal();
+            }
+        });
+
+        notificationConnection.on("ReceiveChatRequest", (data) => {
+            const container = document.getElementById("notifications-container");
+            const newNotification = document.createElement("div");
+            newNotification.className = "notification-item";
+            newNotification.setAttribute("data-request-id", data.SessionRequestId);
+
+            newNotification.innerHTML = `
+                <h5>Nueva Solicitud de Chat</h5>
+                <p><strong>Paciente:</strong> ${data.PatientName}</p>
+                <p><strong>Mensaje:</strong> ${data.InitialMessage}</p>
+                <div>
+                    <button type="button" class="btn-accept" data-request-id="${data.SessionRequestId}">
+                        Aceptar
+                    </button>
+                    <button type="button" class="btn-reject" data-request-id="${data.SessionRequestId}">
+                        Rechazar
+                    </button>
+                </div>
+            `;
+
+            container.prepend(newNotification);
+        });
+
+        notificationConnection.on("ReceiveChatRequestResponse", (data) => {
+            const container = document.getElementById("notifications-container");
+            const responseNotification = document.createElement("div");
+
+            responseNotification.innerHTML = `
+                <h5>${data.Accepted ? 'Solicitud Aceptada' : 'Solicitud Rechazada'}</h5>
+                <p><strong>Psicólogo:</strong> ${data.PsychologistName}</p>
+                <p>${data.Accepted ? 'Tu solicitud de chat ha sido aceptada. Puedes comenzar a chatear.' : 'Tu solicitud de chat ha sido rechazada.'}</p>
+            `;
+
+            container.prepend(responseNotification);
+
+            if (data.Accepted) {
+                setTimeout(() => location.reload(), 3000);
+            }
+        });
+
+        notificationConnection.start()
+            .then(() => {
+                console.log("Conexión de notificaciones iniciada");
+                notificationConnection.invoke("JoinUserGroup", userId);
+            })
+            .catch(err => console.error("Error al conectar notificaciones:", err));
+
+        function handleSessionRequest(requestId, action, notificationElement) {
+            fetch(`/SessionRequest/${action}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "RequestVerificationToken": document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: `sessionRequestId=${requestId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    notificationElement.innerHTML = `
+                        <h5>Solicitud ${action === "Accept" ? "Aceptada" : "Rechazada"}</h5>
+                        <p>La solicitud ha sido procesada correctamente.</p>
+                    `;
+
+                    setTimeout(() => {
+                        notificationElement.remove();
+                        if (action === "Accept") {
+                            location.reload();
+                        }
+                    }, 3000);
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                alert("Error al procesar la solicitud");
+            });
+        }
+
+        // Actualizar el handler de ReceiveMessage para incluir timestamp
+        if (connection) {
+            connection.on("ReceiveMessage", (chatIdReceived, message, sender, timestamp) => {
+                console.log(`Mensaje recibido para chat ${chatIdReceived}:`, { message, sender, timestamp });
+                
+                const chatInfo = activeChats.get(chatIdReceived);
+                if (chatInfo) {
+                    // Formatear el timestamp si está disponible
+                    const timeDisplay = timestamp ? `<span class="timestamp">${timestamp}</span>` : '';
+                    
+                    chatInfo.messagesDiv.innerHTML += `
+                        <div class="message">
+                            <strong>${sender}:</strong> ${message} ${timeDisplay}
+                        </div>`;
+                    
+                    // Scroll automático al final
+                    chatInfo.messagesDiv.scrollTop = chatInfo.messagesDiv.scrollHeight;
+                } else {
+                    console.log(`Chat ${chatIdReceived} no está activo, ignorando mensaje`);
+                }
+            });
+
+            // Agregar handler para errores del chat
+            connection.on("Error", (errorMessage) => {
+                console.error("Error del chat:", errorMessage);
+                alert("Error: " + errorMessage);
+            });
+
+            connection.onreconnecting(() => {
+                activeChats.forEach((chatInfo, chatId) => {
+                    showStatus(chatId, "Reconectando...");
+                });
+            });
+
+            connection.onreconnected(() => {
+                activeChats.forEach((chatInfo, chatId) => {
+                    showStatus(chatId, "Reconectado");
+                    if (chatInfo.isConnected) {
+                        connection.invoke("JoinChat", chatId)
+                            .then(() => {
+                                console.log(`Reconectado al chat ${chatId}`);
+                            })
+                            .catch(err => {
+                                console.error(`Error al reconectar al chat ${chatId}:`, err);
+                            });
+                    }
+                });
+            });
+
+            connection.onclose(() => {
+                activeChats.forEach((chatInfo, chatId) => {
+                    showStatus(chatId, "Conexión perdida. Recargando...");
+                });
+                setTimeout(() => location.reload(), 2000);
+            });
+
+            connection.start()
+                .then(() => {
+                    console.log("Conectado al servidor SignalR");
+                })
+                .catch((err) => {
+                    console.error("Error al conectar con SignalR:", err);
+                    console.log("Error al conectar. Recargando...");
+                    setTimeout(() => location.reload(), 2000);
+                });
+        }
+
+        window.addEventListener("beforeunload", () => {
+            if (connection && connection.state === signalR.HubConnectionState.Connected) {
+                activeChats.forEach((chatInfo, chatId) => {
+                    if (chatInfo.isConnected) {
+                        connection.invoke("LeaveChat", chatId);
+                    }
+                });
+            }
+            if (notificationConnection && notificationConnection.state === signalR.HubConnectionState.Connected) {
+                notificationConnection.invoke("LeaveUserGroup", userId);
+            }
+        });
+    </script>
+
+    <style>
+        /* Estilos básicos para el modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+
+            .modal-content h4 {
+                margin-top: 0;
+            }
+
+            .modal-content div {
+                margin-bottom: 15px;
+            }
+
+            .modal-content label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+            }
+
+            .modal-content input,
+            .modal-content textarea {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+
+        .modal-buttons {
+            text-align: right;
+        }
+
+            .modal-buttons button {
+                margin-left: 10px;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+
+        .btn-save {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .schedule-appointment-btn {
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
 }

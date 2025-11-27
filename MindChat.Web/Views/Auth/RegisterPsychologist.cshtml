@@ -1,0 +1,78 @@
+﻿@model MindChat.Application.DTOs.Psychologists.RegisterPsychologistDto
+@{
+    ViewData["Title"] = "Registro de Psicólogo";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-9 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h3 class="card-title text-center mb-3">Crear cuenta psicólogo</h3>
+
+                    @if (ViewData.ModelState.ErrorCount > 0)
+                    {
+                        <div class="alert alert-danger mb-4">
+                            <ul class="mb-0">
+                                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                                {
+                                    <li>@error.ErrorMessage</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    <form method="post" asp-controller="Auth" asp-action="RegisterPsychologist">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label asp-for="FirstName" class="form-label">Nombre</label>
+                            <input asp-for="FirstName" class="form-control" name="FirstName" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="LastName" class="form-label">Apellido</label>
+                            <input asp-for="LastName" class="form-control" name="LastName" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label">Email</label>
+                            <input asp-for="Email" class="form-control" name="Email" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ProfessionalLicense" class="form-label">Licencia Profesional</label>
+                            <input asp-for="ProfessionalLicense" class="form-control" name="ProfessionalLicense" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="University" class="form-label">Universidad</label>
+                            <input asp-for="University" class="form-control" name="University" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="GraduationDate" class="form-label">Año de Graduación</label>
+                            <input asp-for="GraduationDate" type="date" class="form-control" name="GraduationDate"/>
+                            <span asp-validation-for="GraduationDate" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">Contraseña</label>
+                            <input asp-for="Password" type="password" class="form-control" name="Password" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label">Confirmar contraseña</label>
+                            <input asp-for="ConfirmPassword" type="password" class="form-control" name="ConfirmPassword" />
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Registrarse</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

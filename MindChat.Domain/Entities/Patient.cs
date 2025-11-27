@@ -10,6 +10,7 @@ namespace MindChat.Domain.Entities
     {
         public int Id { get; set; }
         public int UserId { get; set; }
+        public string? EmotionalState { get; set; }
         public ApplicationUser User { get; set; }
 
         public ICollection<SessionRequest> SessionRequests { get; set; }
