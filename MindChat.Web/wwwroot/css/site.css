@@ -20,3 +20,59 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+/* Fondo negro -> morado -> azul y ajustes de contraste */
+body {
+  color: #e6e6f0;
+  background: linear-gradient(180deg, #000000 0%, #4b0082 40%, #2e0082 85%, #1e3a8a 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Tarjetas y fondos semitransparentes para destacar sobre el degradado */
+.card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #ffffff;
+}
+
+.form-control {
+  background: rgba(255,255,255,0.03);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.form-control::placeholder {
+  color: rgba(255,255,255,0.6);
+}
+
+.btn-primary {
+  background-color: #6c4bd6;
+  border-color: #6c4bd6;
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #5a38c0;
+  border-color: #5a38c0;
+}
+
+
+a {
+  color: #cbd5ff;
+  text-decoration: none;
+}
+a:hover {
+  color: #ffffff;
+  text-decoration: underline;
+  font-weight: bold;
+}
+
+.btn-link {
+  color: #cbd5ff;
+  text-decoration: none;
+}
+
+.btn-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
+  font-weight: bold;
+}
