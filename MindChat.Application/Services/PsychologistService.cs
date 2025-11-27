@@ -337,7 +337,7 @@ namespace MindChat.Application.Services
             }
         }
 
-        // Nuevo método: Crear cita desde chat
+        // Método para crear citas desde chat
         public async Task<(bool Success, string Error)> CreateAppointmentFromChatAsync(int psychologistUserId, int chatId, DateTime scheduledAt, string notes)
         {
             try
@@ -389,6 +389,157 @@ namespace MindChat.Application.Services
             catch (Exception)
             {
                 return (false, "Error interno del servidor");
+            }
+        }
+
+        // Nuevos métodos para gestión de citas
+
+        // Buscar citas con filtros opcionales
+        public async Task<IEnumerable<Appointment>> SearchAppointmentsAsync(int psychologistUserId, string? patientName = null, DateTime? fromDate = null, DateTime? toDate = null)
+        {
+            try
+            {
+                var psychologist = await _context.Psychologists
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UserId == psychologistUserId);
+
+                if (psychologist == null)
+                    return Enumerable.Empty<Appointment>();
+
+                var query = _context.Appointments
+                    .AsNoTracking()
+                    .Include(a => a.Patient)
+                        .ThenInclude(p => p.User)
+                    .Where(a => a.PsychologistId == psychologist.Id && !a.IsCancelled);
+
+                // Filtrar por nombre del paciente si se proporciona
+                if (!string.IsNullOrEmpty(patientName))
+                {
+                    query = query.Where(a => a.Patient.User.FullName.Contains(patientName));
+                }
+
+                // Filtrar por rango de fechas
+                if (fromDate.HasValue)
+                {
+                    query = query.Where(a => a.ScheduledAt >= fromDate.Value);
+                }
+
+                if (toDate.HasValue)
+                {
+                    query = query.Where(a => a.ScheduledAt <= toDate.Value);
+                }
+
+                var appointments = await query.OrderBy(a => a.ScheduledAt).ToListAsync();
+                return appointments;
+            }
+            catch (Exception)
+            {
+                return Enumerable.Empty<Appointment>();
+            }
+        }
+
+        // Actualizar una cita existente
+        public async Task<(bool Success, string Error)> UpdateAppointmentAsync(int psychologistUserId, int appointmentId, DateTime scheduledAt, string notes)
+        {
+            try
+            {
+                var psychologist = await _context.Psychologists
+                    .FirstOrDefaultAsync(p => p.UserId == psychologistUserId);
+
+                if (psychologist == null)
+                    return (false, "Psicólogo no encontrado");
+
+                var appointment = await _context.Appointments
+                    .FirstOrDefaultAsync(a => a.Id == appointmentId && 
+                                            a.PsychologistId == psychologist.Id && 
+                                            !a.IsCancelled);
+
+                if (appointment == null)
+                    return (false, "Cita no encontrada");
+
+                // Verificar que la fecha sea futura
+                if (scheduledAt <= DateTime.Now)
+                    return (false, "La fecha de la cita debe ser futura");
+
+                // Verificar si hay conflictos de horario (excluyendo la cita actual)
+                var conflictingAppointment = await _context.Appointments
+                    .FirstOrDefaultAsync(a => a.PsychologistId == psychologist.Id && 
+                                            a.ScheduledAt == scheduledAt && 
+                                            a.Id != appointmentId && 
+                                            !a.IsCancelled);
+
+                if (conflictingAppointment != null)
+                    return (false, "Ya tienes una cita programada en ese horario");
+
+                // Actualizar la cita
+                appointment.ScheduledAt = scheduledAt;
+                appointment.Notes = notes ?? "";
+
+                await _context.SaveChangesAsync();
+                return (true, "");
+            }
+            catch (Exception)
+            {
+                return (false, "Error interno del servidor");
+            }
+        }
+
+        // Eliminar (cancelar) una cita
+        public async Task<(bool Success, string Error)> DeleteAppointmentAsync(int psychologistUserId, int appointmentId)
+        {
+            try
+            {
+                var psychologist = await _context.Psychologists
+                    .FirstOrDefaultAsync(p => p.UserId == psychologistUserId);
+
+                if (psychologist == null)
+                    return (false, "Psicólogo no encontrado");
+
+                var appointment = await _context.Appointments
+                    .FirstOrDefaultAsync(a => a.Id == appointmentId && 
+                                            a.PsychologistId == psychologist.Id && 
+                                            !a.IsCancelled);
+
+                if (appointment == null)
+                    return (false, "Cita no encontrada");
+
+                // Marcar la cita como cancelada en lugar de eliminarla físicamente
+                appointment.IsCancelled = true;
+
+                await _context.SaveChangesAsync();
+                return (true, "");
+            }
+            catch (Exception)
+            {
+                return (false, "Error interno del servidor");
+            }
+        }
+
+        // Obtener una cita específica
+        public async Task<Appointment?> GetAppointmentAsync(int psychologistUserId, int appointmentId)
+        {
+            try
+            {
+                var psychologist = await _context.Psychologists
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UserId == psychologistUserId);
+
+                if (psychologist == null)
+                    return null;
+
+                var appointment = await _context.Appointments
+                    .AsNoTracking()
+                    .Include(a => a.Patient)
+                        .ThenInclude(p => p.User)
+                    .FirstOrDefaultAsync(a => a.Id == appointmentId && 
+                                            a.PsychologistId == psychologist.Id && 
+                                            !a.IsCancelled);
+
+                return appointment;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
     }

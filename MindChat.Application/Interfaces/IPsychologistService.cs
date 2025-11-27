@@ -23,7 +23,13 @@ namespace MindChat.Application.Interfaces
         // Método para obtener información de una solicitud de sesión
         Task<SessionRequestInfoDto?> GetSessionRequestInfoAsync(int sessionRequestId);
         
-        // Nuevo método para crear citas desde chat
+        // Método para crear citas desde chat
         Task<(bool Success, string Error)> CreateAppointmentFromChatAsync(int psychologistUserId, int chatId, DateTime scheduledAt, string notes);
+        
+        // Nuevos métodos para gestión de citas
+        Task<IEnumerable<Appointment>> SearchAppointmentsAsync(int psychologistUserId, string? patientName = null, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<(bool Success, string Error)> UpdateAppointmentAsync(int psychologistUserId, int appointmentId, DateTime scheduledAt, string notes);
+        Task<(bool Success, string Error)> DeleteAppointmentAsync(int psychologistUserId, int appointmentId);
+        Task<Appointment?> GetAppointmentAsync(int psychologistUserId, int appointmentId);
     }
 }

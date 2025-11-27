@@ -144,40 +144,58 @@
 
         <!-- Sección: Mis Citas (para ambos perfiles) -->
         <div>
-            <h3>Mis Citas</h3>
-            @if (!appointments.Any())
-            {
-                <p>No tienes citas programadas.</p>
-            }
-            else
-            {
-                <ul>
-                    @foreach (var appt in appointments)
-                    {
-                        string personName = "";
-                        if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+            <div class="appointments-header">
+                <h3>Mis Citas</h3>
+                @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+                {
+                    <button type="button" id="search-appointments-btn" class="search-btn">Buscar Citas</button>
+                }
+            </div>
+
+            <div id="appointments-list">
+                @if (!appointments.Any())
+                {
+                    <p>No tienes citas programadas.</p>
+                }
+                else
+                {
+                    <ul id="appointments-ul">
+                        @foreach (var appt in appointments)
                         {
-                            // Para pacientes, mostrar el nombre del psicólogo
-                            personName = appt.Psychologist?.User?.FullName ?? "Psicólogo";
+                            string personName = "";
+                            if (string.Equals(activeProfile, "Patient", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Para pacientes, mostrar el nombre del psicólogo
+                                personName = appt.Psychologist?.User?.FullName ?? "Psicólogo";
+                            }
+                            else
+                            {
+                                // Para psicólogos, mostrar el nombre del paciente
+                                personName = appt.Patient?.User?.FullName ?? "Paciente";
+                            }
+
+                            <li data-appointment-id="@appt.Id">
+                                <div class="appointment-item">
+                                    <div class="appointment-info">
+                                        <strong>@personName</strong> - @appt.ScheduledAt.ToString("g")
+                                        @if (!string.IsNullOrEmpty(appt.Notes))
+                                        {
+                                            <div>@appt.Notes</div>
+                                        }
+                                    </div>
+                                    @if (string.Equals(activeProfile, "Psychologist", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <div class="appointment-actions">
+                                            <button type="button" class="edit-appointment-btn" data-appointment-id="@appt.Id">Editar</button>
+                                            <button type="button" class="delete-appointment-btn" data-appointment-id="@appt.Id">Eliminar</button>
+                                        </div>
+                                    }
+                                </div>
+                            </li>
                         }
-                        else
-                        {
-                            // Para psicólogos, mostrar el nombre del paciente
-                            personName = appt.Patient?.User?.FullName ?? "Paciente";
-                        }
-                        
-                        <li>
-                            <div>
-                                <strong>@personName</strong> - @appt.ScheduledAt.ToString("g")
-                                @if (!string.IsNullOrEmpty(appt.Notes))
-                                {
-                                    <div>@appt.Notes</div>
-                                }
-                            </div>
-                        </li>
-                    }
-                </ul>
-            }
+                    </ul>
+                }
+            </div>
         </div>
 
         <!-- Si el perfil activo es Patient: listar psicólogos visibles -->
@@ -222,10 +240,11 @@
         <!-- Modal para agendar cita -->
         <div id="appointment-modal" class="modal">
             <div class="modal-content">
-                <h4>Agendar Nueva Cita</h4>
+                <h4 id="appointment-modal-title">Agendar Nueva Cita</h4>
                 <form id="appointment-form">
                     @Html.AntiForgeryToken()
                     <input type="hidden" id="appointment-chat-id" />
+                    <input type="hidden" id="appointment-id" />
                     <div>
                         <label for="appointment-date">Fecha y Hora:</label>
                         <input type="datetime-local" id="appointment-date" required />
@@ -235,7 +254,33 @@
                         <textarea id="appointment-notes" rows="3" placeholder="Escriba notas adicionales para la cita..."></textarea>
                     </div>
                     <div class="modal-buttons">
-                        <button type="submit" class="btn-save">Agendar Cita</button>
+                        <button type="submit" class="btn-save" id="save-appointment-btn">Agendar Cita</button>
+                        <button type="button" class="btn-cancel">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal para buscar citas -->
+        <div id="search-modal" class="modal">
+            <div class="modal-content">
+                <h4>Buscar Citas</h4>
+                <form id="search-form">
+                    <div>
+                        <label for="search-patient-name">Nombre del Paciente:</label>
+                        <input type="text" id="search-patient-name" placeholder="Buscar por nombre..." />
+                    </div>
+                    <div>
+                        <label for="search-from-date">Desde:</label>
+                        <input type="date" id="search-from-date" />
+                    </div>
+                    <div>
+                        <label for="search-to-date">Hasta:</label>
+                        <input type="date" id="search-to-date" />
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-search">Buscar</button>
+                        <button type="button" class="btn-clear">Limpiar Filtros</button>
                         <button type="button" class="btn-cancel">Cancelar</button>
                     </div>
                 </form>
@@ -256,10 +301,12 @@
             .withAutomaticReconnect()
             .build();
 
-        // Objetos para gestionar múltiples chats
+        // Objetos para gestionar múltiples chats y modals
         const activeChats = new Map(); // chatId -> { element, connection, isConnected }
         const chatSectionsContainer = document.getElementById("chat-sections-container");
         const appointmentModal = document.getElementById("appointment-modal");
+        const searchModal = document.getElementById("search-modal");
+        let isEditMode = false;
 
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/chathub")
@@ -373,28 +420,64 @@
         }
 
         // Funciones para manejar el modal de citas
-        function openAppointmentModal(chatId) {
-            document.getElementById("appointment-chat-id").value = chatId;
+        function openAppointmentModal(chatId = null, appointmentId = null) {
+            isEditMode = appointmentId !== null;
 
-            // Establecer fecha mínima como mañana
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(9, 0, 0, 0); // Establecer hora por defecto a las 9:00 AM
+            document.getElementById("appointment-chat-id").value = chatId || '';
+            document.getElementById("appointment-id").value = appointmentId || '';
 
-            const dateInput = document.getElementById("appointment-date");
-            dateInput.min = new Date().toISOString().slice(0, 16);
-            dateInput.value = tomorrow.toISOString().slice(0, 16);
+            const title = document.getElementById("appointment-modal-title");
+            const saveBtn = document.getElementById("save-appointment-btn");
+
+            if (isEditMode) {
+                title.textContent = "Editar Cita";
+                saveBtn.textContent = "Actualizar Cita";
+
+                // Cargar datos de la cita
+                loadAppointmentData(appointmentId);
+            } else {
+                title.textContent = "Agendar Nueva Cita";
+                saveBtn.textContent = "Agendar Cita";
+
+                // Establecer fecha mínima como mañana
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(9, 0, 0, 0);
+
+                const dateInput = document.getElementById("appointment-date");
+                dateInput.min = new Date().toISOString().slice(0, 16);
+                dateInput.value = tomorrow.toISOString().slice(0, 16);
+            }
 
             appointmentModal.style.display = "block";
+        }
+
+        function loadAppointmentData(appointmentId) {
+            fetch(`/Appointment/Get?appointmentId=${appointmentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById("appointment-date").value = data.appointment.scheduledAt;
+                        document.getElementById("appointment-notes").value = data.appointment.notes;
+                    } else {
+                        alert("Error al cargar los datos de la cita: " + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                    alert("Error al cargar los datos de la cita");
+                });
         }
 
         function closeAppointmentModal() {
             appointmentModal.style.display = "none";
             document.getElementById("appointment-form").reset();
+            isEditMode = false;
         }
 
-        function scheduleAppointment() {
+        function scheduleOrUpdateAppointment() {
             const chatId = document.getElementById("appointment-chat-id").value;
+            const appointmentId = document.getElementById("appointment-id").value;
             const scheduledAt = document.getElementById("appointment-date").value;
             const notes = document.getElementById("appointment-notes").value;
 
@@ -403,28 +486,145 @@
                 return;
             }
 
-            fetch('/Appointment/Create', {
+            const url = isEditMode ? '/Appointment/Update' : '/Appointment/Create';
+            let body = `scheduledAt=${encodeURIComponent(scheduledAt)}&notes=${encodeURIComponent(notes)}`;
+
+            if (isEditMode) {
+                body += `&appointmentId=${appointmentId}`;
+            } else {
+                body += `&chatId=${chatId}`;
+            }
+
+            fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
                 },
-                body: `chatId=${chatId}&scheduledAt=${encodeURIComponent(scheduledAt)}&notes=${encodeURIComponent(notes)}`
+                body: body
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert("Cita agendada exitosamente");
+                    alert(data.message);
                     closeAppointmentModal();
-                    location.reload(); // Recargar para mostrar la nueva cita
+                    location.reload();
                 } else {
                     alert("Error: " + data.error);
                 }
             })
             .catch(err => {
                 console.error("Error:", err);
-                alert("Error al agendar la cita");
+                alert("Error al procesar la cita");
             });
+        }
+
+        function deleteAppointment(appointmentId) {
+            if (!confirm("¿Estás seguro de que deseas eliminar esta cita?")) {
+                return;
+            }
+
+            fetch('/Appointment/Delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: `appointmentId=${appointmentId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Remover la cita de la lista
+                    const appointmentItem = document.querySelector(`li[data-appointment-id="${appointmentId}"]`);
+                    if (appointmentItem) {
+                        appointmentItem.remove();
+                    }
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                alert("Error al eliminar la cita");
+            });
+        }
+
+        function openSearchModal() {
+            searchModal.style.display = "block";
+        }
+
+        function closeSearchModal() {
+            searchModal.style.display = "none";
+            document.getElementById("search-form").reset();
+        }
+
+        function searchAppointments() {
+            const patientName = document.getElementById("search-patient-name").value;
+            const fromDate = document.getElementById("search-from-date").value;
+            const toDate = document.getElementById("search-to-date").value;
+
+            let url = '/Appointment/Search?';
+            const params = [];
+
+            if (patientName) params.push(`patientName=${encodeURIComponent(patientName)}`);
+            if (fromDate) params.push(`fromDate=${encodeURIComponent(fromDate)}`);
+            if (toDate) params.push(`toDate=${encodeURIComponent(toDate)}`);
+
+            url += params.join('&');
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateAppointmentsList(data.appointments);
+                        closeSearchModal();
+                    } else {
+                        alert("Error en la búsqueda: " + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                    alert("Error al buscar citas");
+                });
+        }
+
+        function updateAppointmentsList(appointments) {
+            const appointmentsList = document.getElementById("appointments-ul");
+            appointmentsList.innerHTML = "";
+
+            if (appointments.length === 0) {
+                appointmentsList.innerHTML = '<li>No se encontraron citas que coincidan con los criterios de búsqueda.</li>';
+                return;
+            }
+
+            appointments.forEach(appt => {
+                const listItem = document.createElement("li");
+                listItem.setAttribute("data-appointment-id", appt.id);
+
+                listItem.innerHTML = `
+                    <div class="appointment-item">
+                        <div class="appointment-info">
+                            <strong>${appt.patientName}</strong> - ${appt.scheduledAtFormatted}
+                            ${appt.notes ? `<div>${appt.notes}</div>` : ''}
+                        </div>
+                        ${activeProfile === "Psychologist" ? `
+                        <div class="appointment-actions">
+                            <button type="button" class="edit-appointment-btn" data-appointment-id="${appt.id}">Editar</button>
+                            <button type="button" class="delete-appointment-btn" data-appointment-id="${appt.id}">Eliminar</button>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                appointmentsList.appendChild(listItem);
+            });
+        }
+
+        function clearSearchFilters() {
+            document.getElementById("search-form").reset();
+            location.reload(); // Recargar para mostrar todas las citas
         }
 
         document.addEventListener("click", function(e) {
@@ -441,6 +641,14 @@
             } else if (e.target.classList.contains("schedule-appointment-btn")) {
                 const chatId = parseInt(e.target.getAttribute("data-chat-id"));
                 openAppointmentModal(chatId);
+            } else if (e.target.classList.contains("edit-appointment-btn")) {
+                const appointmentId = parseInt(e.target.getAttribute("data-appointment-id"));
+                openAppointmentModal(null, appointmentId);
+            } else if (e.target.classList.contains("delete-appointment-btn")) {
+                const appointmentId = parseInt(e.target.getAttribute("data-appointment-id"));
+                deleteAppointment(appointmentId);
+            } else if (e.target.id === "search-appointments-btn") {
+                openSearchModal();
             } else if (e.target.classList.contains("btn-accept")) {
                 const requestId = e.target.getAttribute("data-request-id");
                 handleSessionRequest(requestId, "Accept", e.target.closest(".notification-item"));
@@ -449,19 +657,29 @@
                 handleSessionRequest(requestId, "Reject", e.target.closest(".notification-item"));
             } else if (e.target.classList.contains("btn-cancel")) {
                 closeAppointmentModal();
+                closeSearchModal();
+            } else if (e.target.classList.contains("btn-search")) {
+                e.preventDefault();
+                searchAppointments();
+            } else if (e.target.classList.contains("btn-clear")) {
+                e.preventDefault();
+                clearSearchFilters();
             }
         });
 
         // Event listener para el formulario de citas
         document.getElementById("appointment-form").addEventListener("submit", function(e) {
             e.preventDefault();
-            scheduleAppointment();
+            scheduleOrUpdateAppointment();
         });
 
-        // Cerrar modal si se hace clic fuera de él
+        // Cerrar modals si se hace clic fuera de ellos
         window.addEventListener("click", function(e) {
             if (e.target === appointmentModal) {
                 closeAppointmentModal();
+            }
+            if (e.target === searchModal) {
+                closeSearchModal();
             }
         });
 

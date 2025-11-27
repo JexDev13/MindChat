@@ -64,5 +64,89 @@ namespace MindChat.Web.Controllers
 
             return Json(new { success = true, message = "Cita agendada exitosamente" });
         }
+
+        [HttpGet]
+        public async Task<IActionResult> Search(string? patientName, DateTime? fromDate, DateTime? toDate)
+        {
+            var (success, userId) = await GetUserIdFromJwtAsync();
+            if (!success)
+                return Json(new { success = false, error = "Usuario no autenticado" });
+
+            var appointments = await _psychologistService.SearchAppointmentsAsync(userId, patientName, fromDate, toDate);
+            
+            var appointmentData = appointments.Select(a => new
+            {
+                id = a.Id,
+                patientName = a.Patient.User.FullName,
+                scheduledAt = a.ScheduledAt.ToString("yyyy-MM-ddTHH:mm"),
+                notes = a.Notes,
+                scheduledAtFormatted = a.ScheduledAt.ToString("g")
+            });
+
+            return Json(new { success = true, appointments = appointmentData });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Get(int appointmentId)
+        {
+            var (success, userId) = await GetUserIdFromJwtAsync();
+            if (!success)
+                return Json(new { success = false, error = "Usuario no autenticado" });
+
+            var appointment = await _psychologistService.GetAppointmentAsync(userId, appointmentId);
+            
+            if (appointment == null)
+                return Json(new { success = false, error = "Cita no encontrada" });
+
+            var appointmentData = new
+            {
+                id = appointment.Id,
+                patientName = appointment.Patient.User.FullName,
+                scheduledAt = appointment.ScheduledAt.ToString("yyyy-MM-ddTHH:mm"),
+                notes = appointment.Notes
+            };
+
+            return Json(new { success = true, appointment = appointmentData });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Update(int appointmentId, DateTime scheduledAt, string notes = "")
+        {
+            var (success, userId) = await GetUserIdFromJwtAsync();
+            if (!success)
+                return Json(new { success = false, error = "Usuario no autenticado" });
+
+            var result = await _psychologistService.UpdateAppointmentAsync(userId, appointmentId, scheduledAt, notes);
+            
+            if (!result.Success)
+            {
+                return Json(new { success = false, error = result.Error });
+            }
+
+            _logger.LogInformation($"Appointment {appointmentId} updated by psychologist {userId}");
+
+            return Json(new { success = true, message = "Cita actualizada exitosamente" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int appointmentId)
+        {
+            var (success, userId) = await GetUserIdFromJwtAsync();
+            if (!success)
+                return Json(new { success = false, error = "Usuario no autenticado" });
+
+            var result = await _psychologistService.DeleteAppointmentAsync(userId, appointmentId);
+            
+            if (!result.Success)
+            {
+                return Json(new { success = false, error = result.Error });
+            }
+
+            _logger.LogInformation($"Appointment {appointmentId} deleted by psychologist {userId}");
+
+            return Json(new { success = true, message = "Cita eliminada exitosamente" });
+        }
     }
 }
