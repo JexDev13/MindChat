@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MindChat.Application.DTOs.Patients;
@@ -15,6 +18,8 @@ namespace MindChat.Application.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext _context;
         private readonly ILogger<PatientService> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
@@ -29,6 +34,14 @@ namespace MindChat.Application.Services
         public async Task<ApplicationUser?> FindByUsernameAsync(string userEmail)
         {
             return await _userManager.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
+        }
+
+        public async Task<ApplicationUser?> FindByIdAsync(int userId)
+        {
+            return await _userManager.Users
+                .Include(u => u.PatientProfile)
+                .Include(u => u.PsychologistProfile)
+                .FirstOrDefaultAsync(u => u.Id == userId);
         }
 
         public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password)
