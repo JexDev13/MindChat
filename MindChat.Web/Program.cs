@@ -123,6 +123,7 @@ builder.Services.AddScoped<IPsychologistService, PsychologistService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IChatService, ChatService>(); // Agregado el servicio de chat
 builder.Services.AddScoped<INotificationService, MindChat.Web.Services.NotificationService>();
 
 // Logging

@@ -378,12 +378,19 @@
 
             // Conectar al chat específico
             if (connection.state === signalR.HubConnectionState.Connected) {
+                showStatus(selectedChatId, "Conectando al chat...");
                 connection.invoke("JoinChat", selectedChatId)
                     .then(() => {
                         showStatus(selectedChatId, "Conectado al chat");
                         activeChats.get(selectedChatId).isConnected = true;
+                        console.log(`Conectado al chat ${selectedChatId}, esperando historial...`);
                     })
-                    .catch(err => showStatus(selectedChatId, "Error al unirse al chat"));
+                    .catch(err => {
+                        console.error("Error al unirse al chat:", err);
+                        showStatus(selectedChatId, "Error al unirse al chat");
+                    });
+            } else {
+                showStatus(selectedChatId, "Esperando conexión...");
             }
         }
 
@@ -763,13 +770,32 @@
             });
         }
 
+        // Actualizar el handler de ReceiveMessage para incluir timestamp
         if (connection) {
-            connection.on("ReceiveMessage", (chatIdReceived, message, sender) => {
+            connection.on("ReceiveMessage", (chatIdReceived, message, sender, timestamp) => {
+                console.log(`Mensaje recibido para chat ${chatIdReceived}:`, { message, sender, timestamp });
+                
                 const chatInfo = activeChats.get(chatIdReceived);
-                if (chatInfo && chatInfo.isConnected) {
-                    chatInfo.messagesDiv.innerHTML += `<div><strong>${sender}:</strong> ${message}</div>`;
+                if (chatInfo) {
+                    // Formatear el timestamp si está disponible
+                    const timeDisplay = timestamp ? `<span class="timestamp">${timestamp}</span>` : '';
+                    
+                    chatInfo.messagesDiv.innerHTML += `
+                        <div class="message">
+                            <strong>${sender}:</strong> ${message} ${timeDisplay}
+                        </div>`;
+                    
+                    // Scroll automático al final
                     chatInfo.messagesDiv.scrollTop = chatInfo.messagesDiv.scrollHeight;
+                } else {
+                    console.log(`Chat ${chatIdReceived} no está activo, ignorando mensaje`);
                 }
+            });
+
+            // Agregar handler para errores del chat
+            connection.on("Error", (errorMessage) => {
+                console.error("Error del chat:", errorMessage);
+                alert("Error: " + errorMessage);
             });
 
             connection.onreconnecting(() => {
@@ -782,7 +808,13 @@
                 activeChats.forEach((chatInfo, chatId) => {
                     showStatus(chatId, "Reconectado");
                     if (chatInfo.isConnected) {
-                        connection.invoke("JoinChat", chatId);
+                        connection.invoke("JoinChat", chatId)
+                            .then(() => {
+                                console.log(`Reconectado al chat ${chatId}`);
+                            })
+                            .catch(err => {
+                                console.error(`Error al reconectar al chat ${chatId}:`, err);
+                            });
                     }
                 });
             });
@@ -796,9 +828,10 @@
 
             connection.start()
                 .then(() => {
-                    console.log("Conectado al servidor");
+                    console.log("Conectado al servidor SignalR");
                 })
-                .catch(() => {
+                .catch((err) => {
+                    console.error("Error al conectar con SignalR:", err);
                     console.log("Error al conectar. Recargando...");
                     setTimeout(() => location.reload(), 2000);
                 });
