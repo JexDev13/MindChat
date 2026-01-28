@@ -1,0 +1,157 @@
+name: MindChat CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies - Auth Service
+      run: dotnet restore services/auth-service/auth-service.csproj
+
+    - name: Build Auth Service
+      run: dotnet build services/auth-service/auth-service.csproj --configuration Release --no-restore
+
+    - name: Restore dependencies - Clinical Service
+      run: dotnet restore services/clinical-service/clinical-service.csproj
+
+    - name: Build Clinical Service
+      run: dotnet build services/clinical-service/clinical-service.csproj --configuration Release --no-restore
+
+    - name: Restore dependencies - API Gateway
+      run: dotnet restore infra/api-gateway/api-gateway.csproj
+
+    - name: Build API Gateway
+      run: dotnet build infra/api-gateway/api-gateway.csproj --configuration Release --no-restore
+
+  build-docker-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract metadata for Auth Service
+      id: meta-auth
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.DOCKER_USERNAME }}/mindchat-auth-service
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Auth Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./services/auth-service/Dockerfile
+        push: true
+        tags: ${{ steps.meta-auth.outputs.tags }}
+        labels: ${{ steps.meta-auth.outputs.labels }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mindchat-auth-service:buildcache
+        cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mindchat-auth-service:buildcache,mode=max
+
+    - name: Extract metadata for Clinical Service
+      id: meta-clinical
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.DOCKER_USERNAME }}/mindchat-clinical-service
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Clinical Service
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./services/clinical-service/Dockerfile
+        push: true
+        tags: ${{ steps.meta-clinical.outputs.tags }}
+        labels: ${{ steps.meta-clinical.outputs.labels }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mindchat-clinical-service:buildcache
+        cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mindchat-clinical-service:buildcache,mode=max
+
+    - name: Extract metadata for API Gateway
+      id: meta-gateway
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ secrets.DOCKER_USERNAME }}/mindchat-api-gateway
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push API Gateway
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./infra/api-gateway/Dockerfile
+        push: true
+        tags: ${{ steps.meta-gateway.outputs.tags }}
+        labels: ${{ steps.meta-gateway.outputs.labels }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mindchat-api-gateway:buildcache
+        cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mindchat-api-gateway:buildcache,mode=max
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: build-docker-images
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy notification
+      run: |
+        echo "Deploying to development environment..."
+        # Aquí puedes agregar comandos para desplegar a tu entorno de desarrollo
+        # Por ejemplo: kubectl apply, helm upgrade, docker-compose, etc.
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-docker-images
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy notification
+      run: |
+        echo "Deploying to production environment..."
+        # Aquí puedes agregar comandos para desplegar a tu entorno de producción
