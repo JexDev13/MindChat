@@ -1,0 +1,107 @@
+### MindChat - Appointment Service API Tests
+@baseUrl = http://localhost:5002
+@gatewayUrl = http://localhost:8080
+@token = YOUR_JWT_TOKEN_HERE
+
+### Health Check
+GET {{baseUrl}}/health
+
+### Health Check via Gateway
+GET {{gatewayUrl}}/appointments/health
+
+###
+### APPOINTMENTS ENDPOINTS
+###
+
+### Get All Appointments
+GET {{baseUrl}}/api/appointments
+Authorization: Bearer {{token}}
+
+### Get All Appointments via Gateway
+GET {{gatewayUrl}}/api/appointments
+Authorization: Bearer {{token}}
+
+### Get Appointment by ID
+@appointmentId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/appointments/{{appointmentId}}
+Authorization: Bearer {{token}}
+
+### Get Appointments by Psychologist
+@psychologistId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/appointments/psychologist/{{psychologistId}}
+Authorization: Bearer {{token}}
+
+### Get Appointments by Patient
+@patientId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/appointments/patient/{{patientId}}
+Authorization: Bearer {{token}}
+
+### Create New Appointment
+POST {{baseUrl}}/api/appointments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "psychologistId": "00000000-0000-0000-0000-000000000000",
+  "patientId": "00000000-0000-0000-0000-000000000000",
+  "scheduledAt": "2024-02-15T10:00:00Z",
+  "notes": "Primera sesión de terapia cognitiva"
+}
+
+### Create Appointment via Gateway
+POST {{gatewayUrl}}/api/appointments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "psychologistId": "00000000-0000-0000-0000-000000000000",
+  "patientId": "00000000-0000-0000-0000-000000000000",
+  "scheduledAt": "2024-02-20T14:30:00Z",
+  "notes": "Seguimiento de sesión anterior"
+}
+
+### Update Appointment
+@updateAppointmentId = 00000000-0000-0000-0000-000000000000
+PUT {{baseUrl}}/api/appointments/{{updateAppointmentId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "scheduledAt": "2024-02-15T15:00:00Z",
+  "notes": "Cambio de horario - Primera sesión de terapia cognitiva"
+}
+
+### Cancel Appointment
+@cancelAppointmentId = 00000000-0000-0000-0000-000000000000
+PATCH {{baseUrl}}/api/appointments/{{cancelAppointmentId}}/cancel
+Authorization: Bearer {{token}}
+
+### Cancel Appointment via Gateway
+PATCH {{gatewayUrl}}/api/appointments/{{cancelAppointmentId}}/cancel
+Authorization: Bearer {{token}}
+
+### Delete Appointment
+@deleteAppointmentId = 00000000-0000-0000-0000-000000000000
+DELETE {{baseUrl}}/api/appointments/{{deleteAppointmentId}}
+Authorization: Bearer {{token}}
+
+###
+### ERROR CASES
+###
+
+### Create Appointment with Past Date (should fail)
+POST {{baseUrl}}/api/appointments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "psychologistId": "00000000-0000-0000-0000-000000000000",
+  "patientId": "00000000-0000-0000-0000-000000000000",
+  "scheduledAt": "2020-01-01T10:00:00Z",
+  "notes": "Esta fecha ya pasó"
+}
+
+### Get Non-existent Appointment
+GET {{baseUrl}}/api/appointments/99999999-9999-9999-9999-999999999999
+Authorization: Bearer {{token}}
+
