@@ -11,21 +11,22 @@ Este directorio contiene todos los microservicios que componen la aplicación Mi
 │   (Ocelot)      │
 └────────┬────────┘
          │
-    ┌────┴────────────────────────┐
-    │                             │
-┌───▼────────┐            ┌──────▼──────┐
-│ Auth       │            │  Clinical   │
-│ Service    │───────────▶│  Service    │
-│ (Port 5000)│            │ (Port 5001) │
-└────────────┘            └─────────────┘
-     │                          │
-     │                          │
-     ▼                          ▼
-┌─────────────────────────────────┐
-│      SQL Server                 │
-│  - BDD_MindChat_Identity        │
-│  - BDD_MindChat_Clinical        │
-└─────────────────────────────────┘
+    ┌────┴────────────────────────────────┐
+    │                 │                   │
+┌───▼────────┐  ┌────▼─────────┐  ┌──────▼──────────┐
+│ Auth       │  │ Clinical     │  │ Appointment     │
+│ Service    │─▶│ Service      │  │ Service         │
+│ (Port 5000)│  │ (Port 5001)  │  │ (Port 5002)     │
+└────────────┘  └──────────────┘  └─────────────────┘
+     │                │                     │
+     │                │                     │
+     ▼                ▼                     ▼
+┌──────────────────────────────────────────────────┐
+│              SQL Server                          │
+│  - BDD_MindChat_Identity                         │
+│  - BDD_MindChat_Clinical                         │
+│  - BDD_MindChat_Appointments                     │
+└──────────────────────────────────────────────────┘
 ```
 
 ## Servicios Disponibles
@@ -55,19 +56,18 @@ Este directorio contiene todos los microservicios que componen la aplicación Mi
 
 [Ver documentación completa →](./clinical-service/clinical-service.md)
 
-### 3. Appointment Service (Próximamente)
-- **Puerto**: 5001
-- **Base de Datos**: BDD_MindChat_Clinical
-- **Responsabilidad**: Gestión de perfiles clínicos, tags, contactos
-- **Endpoints planeados**:
-  - `/api/patients`
-  - `/api/psychologists`
-  - `/api/tags`
-
-### 3. Appointment Service (Próximamente)
+### 3. Appointment Service ✅
 - **Puerto**: 5002
 - **Base de Datos**: BDD_MindChat_Appointments
-- **Responsabilidad**: Gestión de citas y calendario
+- **Responsabilidad**: Gestión de citas entre pacientes y psicólogos
+- **Endpoints**:
+  - `/api/appointments` (CRUD)
+  - `/api/appointments/psychologist/{id}` (Citas por psicólogo)
+  - `/api/appointments/patient/{id}` (Citas por paciente)
+  - `/api/appointments/{id}/cancel` (Cancelar cita)
+  - `/health`
+
+[Ver documentación completa →](./servicio-citas/README.md)
 
 ### 4. Chat Service (Próximamente)
 - **Puerto**: 5003

@@ -59,6 +59,25 @@ services:
       - mindchat-network
     restart: unless-stopped
 
+  # Appointment Service
+  appointment-service:
+    build:
+      context: .
+      dockerfile: services/servicio-citas/Dockerfile
+    container_name: mindchat-appointment-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=host.docker.internal;Database=BDD_MindChat_Appointments;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
+    ports:
+      - "5002:8080"
+    networks:
+      - mindchat-network
+    restart: unless-stopped
+
   # API Gateway (Ocelot)
   api-gateway:
     build:
@@ -73,6 +92,7 @@ services:
     depends_on:
       - auth-service
       - clinical-service
+      - appointment-service
     networks:
       - mindchat-network
     restart: unless-stopped
