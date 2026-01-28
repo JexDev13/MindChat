@@ -39,14 +39,15 @@ export function LoginForm() {
     
     try {
       // Call real API
-      const response = await apiClient.post('/api/auth/patient/login', {
+      const response = await apiClient.post('/api/auth/login', {
         email: values.email,
         password: values.password
       });
 
       const data = response.data;
       
-      if (data.success) {
+      // API Gateway devuelve: { token, userId, email, fullName, role }
+      if (data.token) {
         // Store token in localStorage and cookie for middleware
         localStorage.setItem('authToken', data.token);
         document.cookie = `authToken=${data.token}; path=/; max-age=86400`;
