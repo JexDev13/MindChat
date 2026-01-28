@@ -3,71 +3,131 @@
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GradientButton } from "@/components/ui/gradient-button";
-import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import { Send, Paperclip, Phone, Video, MoreVertical, Smile } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/auth.store";
+import { chatService } from "@/lib/api/chat.service";
+import { messagesService } from "@/lib/api/chat-rest.service";
+import { toast } from "sonner";
 
 interface Message {
-  id: string;
-  senderId: string;
-  text: string;
-  timestamp: Date;
-  status: 'sent' | 'delivered' | 'read';
+  id?: string;
+  chatId: string;
+  senderUserId: string;
+  message: string;
+  sentAt: string;
 }
 
 export function ChatWindow({ conversationId }: { conversationId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [isConnected, setIsConnected] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
 
-  // Mock initial messages
+  // Conectar a SignalR y cargar mensajes
   useEffect(() => {
-    // In real app, fetch messages API
-    const loadMessages = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      setMessages([
-        { id: "1", senderId: "other", text: "Hello! How are you feeling today?", timestamp: new Date(Date.now() - 100000), status: 'read' },
-        { id: "2", senderId: user?.id || "me", text: "I'm doing better, thanks for asking.", timestamp: new Date(Date.now() - 80000), status: 'read' },
-      ]);
+    const initChat = async () => {
+      if (!token || !conversationId) return;
+
+      try {
+        // Conectar a SignalR
+        await chatService.connect(token);
+        setIsConnected(true);
+
+        // Unirse al chat
+        await chatService.joinChat(conversationId);
+        
+        // Cargar historial de mensajes
+        const history = await messagesService.getByChatId(conversationId);
+        setMessages(history);
+      } catch (error) {
+        console.error("Error al conectar al chat:", error);
+        toast.error("No se pudo conectar al chat");
+      }
     };
-    loadMessages();
-  }, [conversationId, user?.id]);
+
+    initChat();
+
+    // Configurar listeners de SignalR
+    const handleReceiveMessage = (data: { chatId: string; senderUserId: string; message: string; sentAt: string }) => {
+      if (data.chatId === conversationId) {
+        setMessages(prev => [...prev, {
+          chatId: data.chatId,
+          senderUserId: data.senderUserId,
+          message: data.message,
+          sentAt: data.sentAt
+        }]);
+      }
+    };
+
+    const handleChatHistory = (history: Message[]) => {
+      setMessages(history);
+    };
+
+    const handleUserTyping = (data: { chatId: string; userId: string; userName: string }) => {
+      if (data.chatId === conversationId && data.userId !== user?.id) {
+        setIsTyping(true);
+        setTimeout(() => setIsTyping(false), 3000);
+      }
+    };
+
+    chatService.on("ReceiveMessage", handleReceiveMessage);
+    chatService.on("ChatHistory", handleChatHistory);
+    chatService.on("UserTyping", handleUserTyping);
+
+    // Cleanup
+    return () => {
+      chatService.off("ReceiveMessage", handleReceiveMessage);
+      chatService.off("ChatHistory", handleChatHistory);
+      chatService.off("UserTyping", handleUserTyping);
+      chatService.leaveChat(conversationId);
+    };
+  }, [conversationId, token, user?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault(); // If triggered by form submit
-    if (!inputValue.trim()) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      senderId: user?.id || "me",
-      text: inputValue,
-      timestamp: new Date(),
-      status: 'sent'
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-    setInputValue("");
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
     
-    // Simulate backend response
-    setTimeout(() => {
-       setMessages(prev => [...prev, {
-         id: Date.now().toString(),
-         senderId: "other",
-         text: "That's good to hear. Have you been practicing the exercises?",
-         timestamp: new Date(),
-         status: 'sent'
-       }]);
-    }, 2000);
+    // Enviar indicador de "escribiendo..."
+    if (e.target.value && chatService.isConnected()) {
+      chatService.typing(conversationId);
+      
+      // Detener indicador después de 1 segundo de inactividad
+      if (typingTimeout) clearTimeout(typingTimeout);
+      const timeout = setTimeout(() => {
+        chatService.stopTyping(conversationId);
+      }, 1000);
+      setTypingTimeout(timeout);
+    }
+  };
 
-    // Call SignalR
-    // await chatService.sendMessage(conversationId, inputValue);
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || !chatService.isConnected()) return;
+
+    try {
+      // Limpiar timeout de typing
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+        setTypingTimeout(null);
+      }
+      await chatService.stopTyping(conversationId);
+
+      // Enviar mensaje vía SignalR
+      await chatService.sendMessage(conversationId, inputValue);
+      setInputValue("");
+    } catch (error) {
+      console.error("Error al enviar mensaje:", error);
+      toast.error("No se pudo enviar el mensaje");
+    }
   };
 
   return (
@@ -81,8 +141,15 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
           </Avatar>
           <div>
             <h3 className="font-bold text-sm">Dr. Sarah Wilson</h3>
-            <span className="text-xs text-green-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Online
+            <span className={cn(
+              "text-xs flex items-center gap-1",
+              isConnected ? "text-green-500" : "text-gray-500"
+            )}>
+              <span className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                isConnected ? "bg-green-500" : "bg-gray-500"
+              )}></span> 
+              {isConnected ? "Online" : "Offline"}
             </span>
           </div>
         </div>
@@ -102,11 +169,11 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => {
-          const isMe = msg.senderId === (user?.id || "me");
+        {messages.map((msg, index) => {
+          const isMe = msg.senderUserId === user?.id;
           return (
             <motion.div
-              key={msg.id}
+              key={msg.id || index}
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.2 }}
@@ -123,17 +190,35 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
                     : "bg-white/10 border border-white/10 text-foreground rounded-tl-none"
                 )}
               >
-                <p>{msg.text}</p>
+                <p>{msg.message}</p>
                 <div className={cn(
                   "text-[10px] mt-1 flex items-center gap-1 opacity-70",
                   isMe ? "justify-end text-blue-100" : "text-muted-foreground"
                 )}>
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             </motion.div>
           );
         })}
+        
+        {/* Typing indicator */}
+        {isTyping && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div className="bg-white/10 border border-white/10 px-4 py-2 rounded-2xl rounded-tl-none">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
 
@@ -149,9 +234,10 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
                 <input 
                    type="text"
                    value={inputValue}
-                   onChange={(e) => setInputValue(e.target.value)}
+                   onChange={handleInputChange}
                    placeholder="Type your message..."
-                   className="w-full pl-4 pr-10 py-3 bg-white/5 border border-white/10 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                   disabled={!isConnected}
+                   className="w-full pl-4 pr-10 py-3 bg-white/5 border border-white/10 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <button 
                   type="button" 
@@ -165,7 +251,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
           <GradientButton 
             className="rounded-full w-12 h-12 p-0 flex items-center justify-center"
             onClick={(e) => handleSendMessage(e)}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || !isConnected}
           >
             <Send size={18} className={inputValue.trim() ? "translate-x-0.5" : ""} />
           </GradientButton>

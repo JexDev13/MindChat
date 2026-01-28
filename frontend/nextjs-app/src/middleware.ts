@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get('authToken');
+  const token = request.cookies.get('authToken')?.value;
+  const { pathname } = request.nextUrl;
   
   if (!token && request.nextUrl.pathname !== '/login' && request.nextUrl.pathname !== '/register' && request.nextUrl.pathname !== '/' && request.nextUrl.pathname !== '/forgot-password' && request.nextUrl.pathname !== '/reset-password') {
     // If trying to access protected route without token, redirect to login
@@ -19,5 +20,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/chat/:path*', '/appointments/:path*', '/profile/:path*']
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ]
 };
