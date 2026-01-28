@@ -12,17 +12,22 @@ import { User, Stethoscope, ArrowRight, ArrowLeft, Check, Upload } from "lucide-
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import apiClient from "@/lib/api/client";
 
 const registerSchema = z.object({
   userType: z.enum(["patient", "psychologist"]),
-  email: z.string().email(),
-  password: z.string().min(6),
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  // Additional fields
-  specialization: z.string().optional(),
-  license: z.string().optional(),
-  bio: z.string().optional(),
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(6, "Password confirmation is required"),
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  lastName: z.string().min(2, "Last name must be at least 2 characters"),
+  // Psychologist specific fields
+  professionalLicense: z.string().optional(),
+  university: z.string().optional(),
+  graduationDate: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 type RegisterData = z.infer<typeof registerSchema>;
@@ -38,11 +43,12 @@ export function RegisterForm() {
       userType: "patient",
       email: "",
       password: "",
+      confirmPassword: "",
       firstName: "",
       lastName: "",
-      specialization: "",
-      license: "",
-      bio: "",
+      professionalLicense: "",
+      university: "",
+      graduationDate: "",
     },
   });
 
@@ -59,10 +65,77 @@ export function RegisterForm() {
   };
 
   const onSubmit = async (data: RegisterData) => {
-    // Simulate API
-    await new Promise(r => setTimeout(r, 2000));
-    toast.success("Account created successfully!");
-    router.push("/login");
+    try {
+      if (data.userType === "patient") {
+        // Register patient
+        const response = await apiClient.post('/api/auth/patient/register', {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          password: data.password,
+          confirmPassword: data.confirmPassword,
+        });
+
+        if (response.data.success) {
+          toast.success("Account created successfully!", {
+            description: "You can now log in with your credentials."
+          });
+          router.push("/login");
+        } else {
+          toast.error("Registration failed", {
+            description: response.data.errors?.join(', ') || "Please try again."
+          });
+        }
+      } else {
+        // Register psychologist
+        if (!data.professionalLicense || !data.university || !data.graduationDate) {
+          toast.error("Missing required fields", {
+            description: "Please fill in all psychologist information."
+          });
+          return;
+        }
+
+        const response = await apiClient.post('/api/auth/psychologist/register', {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          professionalLicense: data.professionalLicense,
+          university: data.university,
+          graduationDate: data.graduationDate,
+          password: data.password,
+          confirmPassword: data.confirmPassword,
+        });
+
+        if (response.data.success) {
+          toast.success("Account created successfully!", {
+            description: "You can now log in with your credentials."
+          });
+          router.push("/login");
+        } else {
+          toast.error("Registration failed", {
+            description: response.data.errors?.join(', ') || "Please try again."
+          });
+        }
+      }
+    } catch (error: unknown) {
+      const err = error as { 
+        response?: { data?: { errors?: string[] }, status?: number },
+        code?: string,
+        message?: string 
+      };
+      
+      let errorMsg = "Unable to connect to the server. Please try again later.";
+      
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        errorMsg = "Cannot connect to the server. Please check if the backend is running.";
+      } else if (err.response?.status === 400) {
+        errorMsg = err.response?.data?.errors?.join(', ') || "Invalid registration data.";
+      } else if (err.response?.data?.errors) {
+        errorMsg = err.response.data.errors.join(', ');
+      }
+      
+      toast.error("Registration failed", { description: errorMsg });
+    }
   };
 
   const variants = {
@@ -230,6 +303,28 @@ export function RegisterForm() {
                       />
                     )}
                   />
+                  {errors.password && (
+                    <p className="text-sm text-red-400">{errors.password.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium ml-1 text-foreground">Confirm Password</label>
+                  <Controller
+                    name="confirmPassword"
+                    control={control}
+                    render={({ field }) => (
+                      <PlaceholdersAndVanishInput
+                        type="password"
+                        placeholders={["Re-enter your password"]}
+                        onChange={field.onChange}
+                        onSubmit={(e) => e.preventDefault()}
+                      />
+                    )}
+                  />
+                  {errors.confirmPassword && (
+                    <p className="text-sm text-red-400">{errors.confirmPassword.message}</p>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -248,9 +343,9 @@ export function RegisterForm() {
                 {userType === 'psychologist' ? (
                   <>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium ml-1 text-foreground">License Number</label>
+                      <label className="text-sm font-medium ml-1 text-foreground">Professional License</label>
                       <Controller
-                        name="license"
+                        name="professionalLicense"
                         control={control}
                         render={({ field }) => (
                           <PlaceholdersAndVanishInput
@@ -262,13 +357,28 @@ export function RegisterForm() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium ml-1 text-foreground">Specialization</label>
+                      <label className="text-sm font-medium ml-1 text-foreground">University</label>
                       <Controller
-                        name="specialization"
+                        name="university"
                         control={control}
                         render={({ field }) => (
                           <PlaceholdersAndVanishInput
-                            placeholders={["Anxiety, Depression, etc."]}
+                            placeholders={["Harvard University"]}
+                            onChange={field.onChange}
+                            onSubmit={(e) => e.preventDefault()}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium ml-1 text-foreground">Graduation Date</label>
+                      <Controller
+                        name="graduationDate"
+                        control={control}
+                        render={({ field }) => (
+                          <PlaceholdersAndVanishInput
+                            type="date"
+                            placeholders={["YYYY-MM-DD"]}
                             onChange={field.onChange}
                             onSubmit={(e) => e.preventDefault()}
                           />

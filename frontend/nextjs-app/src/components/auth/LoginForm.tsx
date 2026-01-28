@@ -13,10 +13,12 @@ import { GlassCard } from "../shared/GlassCard";
 import { Input } from "../ui/input";
 import { AlertCircle, Loader2 } from "lucide-react";
 import apiClient from "@/lib/api/client";
+import { cn } from "@/lib/utils";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  userType: z.enum(["patient", "psychologist"]).default("patient"),
 });
 
 export function LoginForm() {
@@ -25,11 +27,14 @@ export function LoginForm() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
 
+  const [userType, setUserType] = useState<"patient" | "psychologist">("patient");
+
   const { register, handleSubmit, formState: { errors } } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
       password: "",
+      userType: "patient",
     },
   });
 
@@ -38,8 +43,12 @@ export function LoginForm() {
     setErrorMessage(null);
     
     try {
-      // Call real API
-      const response = await apiClient.post('/api/auth/patient/login', {
+      // Call real API based on user type
+      const endpoint = userType === 'psychologist' 
+        ? '/api/auth/psychologist/login' 
+        : '/api/auth/patient/login';
+      
+      const response = await apiClient.post(endpoint, {
         email: values.email,
         password: values.password
       });
@@ -120,6 +129,34 @@ export function LoginForm() {
         >
           Welcome back to your safe space
         </motion.p>
+        
+        {/* User Type Selector */}
+        <div className="flex gap-2 mt-4 justify-center">
+          <button
+            type="button"
+            onClick={() => setUserType("patient")}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              userType === "patient"
+                ? "bg-purple-500 text-white"
+                : "bg-white/5 text-muted-foreground hover:bg-white/10"
+            )}
+          >
+            Patient
+          </button>
+          <button
+            type="button"
+            onClick={() => setUserType("psychologist")}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              userType === "psychologist"
+                ? "bg-blue-500 text-white"
+                : "bg-white/5 text-muted-foreground hover:bg-white/10"
+            )}
+          >
+            Psychologist
+          </button>
+        </div>
       </div>
 
       {/* Error Message Display */}
