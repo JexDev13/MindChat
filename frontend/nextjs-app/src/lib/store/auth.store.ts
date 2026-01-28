@@ -26,8 +26,20 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       login: (user, token) => 
         set({ user, token, isAuthenticated: true }),
-      logout: () => 
-        set({ user: null, token: null, isAuthenticated: false }),
+      logout: () => {
+        // Clear localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('authToken');
+          // Clear cookie
+          document.cookie = 'authToken=; path=/; max-age=0';
+        }
+        // Clear zustand state
+        set({ user: null, token: null, isAuthenticated: false });
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      },
     }),
     { name: 'auth-storage' }
   )
