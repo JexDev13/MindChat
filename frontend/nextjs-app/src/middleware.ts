@@ -4,9 +4,9 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('authToken');
   
-  if (!token && request.nextUrl.pathname !== '/login' && request.nextUrl.pathname !== '/register' && request.nextUrl.pathname !== '/') {
+  if (!token && request.nextUrl.pathname !== '/login' && request.nextUrl.pathname !== '/register' && request.nextUrl.pathname !== '/' && request.nextUrl.pathname !== '/forgot-password' && request.nextUrl.pathname !== '/reset-password') {
     // If trying to access protected route without token, redirect to login
-    // Exception: Landing page, login, register are public
+    // Exception: Landing page, login, register, forgot-password, reset-password are public
     if (request.nextUrl.pathname.startsWith('/dashboard') || 
         request.nextUrl.pathname.startsWith('/chat') || 
         request.nextUrl.pathname.startsWith('/appointments') ||

@@ -3,6 +3,7 @@ using AuthService.Data;
 using AuthService.Models;
 using AuthService.Services;
 using AuthService.Contracts;
+using AuthService.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -68,6 +69,17 @@ builder.Services.AddHttpClient<IClinicalServiceClient, ClinicalServiceClient>(cl
 // Services Registration
 builder.Services.AddScoped<IAuthService, AuthServiceImpl>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+// Email Configuration
+builder.Services.Configure<EmailSettings>(options =>
+{
+    options.SmtpHost = builder.Configuration["Email:SmtpHost"] ?? "smtp.gmail.com";
+    options.SmtpPort = int.Parse(builder.Configuration["Email:SmtpPort"] ?? "587");
+    options.SenderName = builder.Configuration["Email:SenderName"] ?? "MindChat";
+    options.SenderEmail = builder.Configuration["Email:SenderEmail"] ?? "";
+    options.Password = builder.Configuration["Email:Password"] ?? "";
+});
 
 // API Documentation
 builder.Services.AddEndpointsApiExplorer();
@@ -171,6 +183,36 @@ app.MapPost("/api/auth/psychologist/login", async (
 })
 .WithName("LoginPsychologist")
 .WithTags("Psychologist Authentication")
+.WithOpenApi();
+
+// ====================
+// PASSWORD RECOVERY ENDPOINTS
+// ====================
+
+app.MapPost("/api/auth/forgot-password", async (
+    ForgotPasswordRequest request,
+    IAuthService authService) =>
+{
+    var result = await authService.ForgotPasswordAsync(request);
+    return result.Success 
+        ? Results.Ok(result) 
+        : Results.BadRequest(result);
+})
+.WithName("ForgotPassword")
+.WithTags("Password Recovery")
+.WithOpenApi();
+
+app.MapPost("/api/auth/reset-password", async (
+    ResetPasswordRequest request,
+    IAuthService authService) =>
+{
+    var result = await authService.ResetPasswordAsync(request);
+    return result.Success 
+        ? Results.Ok(result) 
+        : Results.BadRequest(result);
+})
+.WithName("ResetPassword")
+.WithTags("Password Recovery")
 .WithOpenApi();
 
 app.Run();

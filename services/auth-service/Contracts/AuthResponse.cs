@@ -9,5 +9,6 @@ public record AuthResponse
     public string? FullName { get; init; }
     public string? Role { get; init; }
     public string? ProfileId { get; init; }
+    public string? Message { get; init; }
     public IEnumerable<string> Errors { get; init; } = Enumerable.Empty<string>();
 }
