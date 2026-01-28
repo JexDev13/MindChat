@@ -11,22 +11,23 @@ Este directorio contiene todos los microservicios que componen la aplicación Mi
 │   (Ocelot)      │
 └────────┬────────┘
          │
-    ┌────┴────────────────────────────────┐
-    │                 │                   │
-┌───▼────────┐  ┌────▼─────────┐  ┌──────▼──────────┐
-│ Auth       │  │ Clinical     │  │ Appointment     │
-│ Service    │─▶│ Service      │  │ Service         │
-│ (Port 5000)│  │ (Port 5001)  │  │ (Port 5002)     │
-└────────────┘  └──────────────┘  └─────────────────┘
-     │                │                     │
-     │                │                     │
-     ▼                ▼                     ▼
-┌──────────────────────────────────────────────────┐
-│              SQL Server                          │
-│  - BDD_MindChat_Identity                         │
-│  - BDD_MindChat_Clinical                         │
-│  - BDD_MindChat_Appointments                     │
-└──────────────────────────────────────────────────┘
+    ┌────┴─────────────────────────────────────────────────┐
+    │                 │                   │                 │
+┌───▼────────┐  ┌────▼─────────┐  ┌──────▼──────────┐  ┌──▼─────────┐
+│ Auth       │  │ Clinical     │  │ Appointment     │  │ Chat       │
+│ Service    │─▶│ Service      │  │ Service         │  │ Service    │
+│ (Port 5000)│  │ (Port 5001)  │  │ (Port 5002)     │  │(Port 5003) │
+└────────────┘  └──────────────┘  └─────────────────┘  └────────────┘
+     │                │                     │                  │
+     │                │                     │                  │
+     ▼                ▼                     ▼                  ▼
+┌────────────────────────────────────────────────────────────────────┐
+│                        SQL Server                                  │
+│  - BDD_MindChat_Identity                                           │
+│  - BDD_MindChat_Clinical                                           │
+│  - BDD_MindChat_Appointments                                       │
+│  - BDD_MindChat_Chat                                               │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Servicios Disponibles
@@ -69,10 +70,17 @@ Este directorio contiene todos los microservicios que componen la aplicación Mi
 
 [Ver documentación completa →](./servicio-citas/README.md)
 
-### 4. Chat Service (Próximamente)
+### 4. Chat Service ✅
 - **Puerto**: 5003
 - **Base de Datos**: BDD_MindChat_Chat
-- **Responsabilidad**: Mensajería, sesiones, solicitudes
+- **Responsabilidad**: Solicitudes de sesión, chats y mensajería
+- **Endpoints**:
+  - `/api/session-requests` (CRUD + estado)
+  - `/api/chats` (CRUD + cerrar)
+  - `/api/messages` (Enviar, listar, eliminar)
+  - `/health`
+
+[Ver documentación completa →](./chat-service/README.md)
 
 ## Tecnologías Comunes
 

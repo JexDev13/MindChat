@@ -78,6 +78,25 @@ services:
       - mindchat-network
     restart: unless-stopped
 
+  # Chat Service
+  chat-service:
+    build:
+      context: .
+      dockerfile: services/chat-service/Dockerfile
+    container_name: mindchat-chat-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=host.docker.internal;Database=BDD_MindChat_Chat;User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
+    ports:
+      - "5003:8080"
+    networks:
+      - mindchat-network
+    restart: unless-stopped
+
   # API Gateway (Ocelot)
   api-gateway:
     build:
@@ -93,6 +112,7 @@ services:
       - auth-service
       - clinical-service
       - appointment-service
+      - chat-service
     networks:
       - mindchat-network
     restart: unless-stopped
