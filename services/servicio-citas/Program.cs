@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using ServicioCitas.Contracts;
 using ServicioCitas.Data;
 using ServicioCitas.Services;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -75,8 +76,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
+
+// Prometheus metrics middleware
+app.UseHttpMetrics();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Prometheus metrics endpoint
+app.MapMetrics();
 
 // Endpoints
 var appointmentsGroup = app.MapGroup("/api/appointments")

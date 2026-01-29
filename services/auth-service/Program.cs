@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -101,8 +102,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
+
+// Prometheus metrics middleware
+app.UseHttpMetrics();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Prometheus metrics endpoint
+app.MapMetrics();
 
 // Health Check Endpoint
 app.MapGet("/health", () => Results.Ok(new { 

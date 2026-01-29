@@ -6,6 +6,7 @@ using ChatService.Contracts;
 using ChatService.Data;
 using ChatService.Services;
 using ChatService.Hubs;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,8 +103,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
+
+// Prometheus metrics middleware
+app.UseHttpMetrics();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Prometheus metrics endpoint
+app.MapMetrics();
 
 // ============================================================================
 // SESSION REQUEST ENDPOINTS

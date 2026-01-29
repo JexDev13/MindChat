@@ -3,6 +3,7 @@ using Ocelot.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,7 +45,17 @@ var app = builder.Build();
 
 app.UseCors("AllowAll");
 
-// Use Ocelot
+// Prometheus metrics middleware
+app.UseHttpMetrics();
+
+// Prometheus metrics endpoint - DEBE ir antes de Ocelot
+// Usamos MapWhen para interceptar /metrics antes de que Ocelot tome control
+app.MapWhen(
+    context => context.Request.Path.StartsWithSegments("/metrics"),
+    appBranch => appBranch.UseRouting().UseEndpoints(endpoints => endpoints.MapMetrics())
+);
+
+// Use Ocelot (captura todas las demás rutas)
 await app.UseOcelot();
 
 app.Run();

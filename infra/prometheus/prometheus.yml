@@ -1,0 +1,50 @@
+# Prometheus Configuration for MindChat Microservices
+global:
+  scrape_interval: 15s      # How frequently to scrape targets
+  evaluation_interval: 15s  # How frequently to evaluate rules
+  
+  # Attach these labels to any time series or alerts when communicating
+  external_labels:
+    monitor: 'mindchat-monitor'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # API Gateway metrics
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    metrics_path: /metrics
+    scheme: http
+
+  # Auth Service metrics
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8080']
+    metrics_path: /metrics
+    scheme: http
+
+  # Clinical Service metrics
+  - job_name: 'clinical-service'
+    static_configs:
+      - targets: ['clinical-service:8080']
+    metrics_path: /metrics
+    scheme: http
+
+  # Appointment Service metrics
+  - job_name: 'appointment-service'
+    static_configs:
+      - targets: ['appointment-service:8080']
+    metrics_path: /metrics
+    scheme: http
+
+  # Chat Service metrics
+  - job_name: 'chat-service'
+    static_configs:
+      - targets: ['chat-service:8080']
+    metrics_path: /metrics
+    scheme: http
