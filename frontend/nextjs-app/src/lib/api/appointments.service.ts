@@ -5,29 +5,21 @@ export interface Appointment {
   id: string;
   patientId: string;
   psychologistId: string;
-  scheduledDate: string;
-  durationMinutes: number;
-  status: 'Scheduled' | 'Completed' | 'Cancelled';
+  scheduledAt: string;
   notes?: string;
-  createdAt: string;
+  isCancelled: boolean;
 }
 
 export interface CreateAppointmentRequest {
   patientId: string;
   psychologistId: string;
-  scheduledDate: string;
-  durationMinutes: number;
+  scheduledAt: string;
   notes?: string;
 }
 
 export interface UpdateAppointmentRequest {
-  scheduledDate?: string;
-  durationMinutes?: number;
+  scheduledAt?: string;
   notes?: string;
-}
-
-export interface UpdateAppointmentStatusRequest {
-  status: 'Scheduled' | 'Completed' | 'Cancelled';
 }
 
 // ============= APPOINTMENTS SERVICE =============
@@ -56,12 +48,6 @@ export const appointmentsService = {
     return response.data;
   },
 
-  // Get upcoming appointments
-  getUpcoming: async (): Promise<Appointment[]> => {
-    const response = await apiClient.get('/api/appointments/upcoming');
-    return response.data;
-  },
-
   // Create appointment
   create: async (data: CreateAppointmentRequest): Promise<Appointment> => {
     const response = await apiClient.post('/api/appointments', data);
@@ -71,12 +57,6 @@ export const appointmentsService = {
   // Update appointment
   update: async (id: string, data: UpdateAppointmentRequest): Promise<Appointment> => {
     const response = await apiClient.put(`/api/appointments/${id}`, data);
-    return response.data;
-  },
-
-  // Update appointment status
-  updateStatus: async (id: string, data: UpdateAppointmentStatusRequest): Promise<Appointment> => {
-    const response = await apiClient.patch(`/api/appointments/${id}/status`, data);
     return response.data;
   },
 

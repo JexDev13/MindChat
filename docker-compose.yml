@@ -1,23 +1,23 @@
 services:
-  # SQL Server Database (COMENTADO - Usando SQL Server local del host)
-  # sqlserver:
-  #   image: mcr.microsoft.com/mssql/server:2022-latest
-  #   container_name: mindchat-sqlserver
-  #   environment:
-  #     - ACCEPT_EULA=Y
-  #     - SA_PASSWORD=MindChat2024!
-  #     - MSSQL_PID=Developer
-  #   ports:
-  #     - "1433:1433"
-  #   volumes:
-  #     - sqlserver-data:/var/opt/mssql
-  #   networks:
-  #     - mindchat-network
-  #   healthcheck:
-  #     test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "MindChat2024!" -Q "SELECT 1"
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mindchat-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=MindChat2024!
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - mindchat-network
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "MindChat2024!" -Q "SELECT 1" -C
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Auth Service
   auth-service:
@@ -28,7 +28,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Server=host.docker.internal;Database=BDD_MindChat_Identity;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=BDD_MindChat_Identity;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
       - Jwt__Key=${JWT_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
@@ -36,6 +36,9 @@ services:
       - Services__ClinicalServiceUrl=http://clinical-service:8080
     ports:
       - "5000:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     networks:
       - mindchat-network
     restart: unless-stopped
@@ -49,12 +52,15 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Server=host.docker.internal;Database=BDD_MindChat_Clinical;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=BDD_MindChat_Clinical;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
       - Jwt__Key=${JWT_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
     ports:
       - "5001:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     networks:
       - mindchat-network
     restart: unless-stopped
@@ -68,12 +74,15 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Server=host.docker.internal;Database=BDD_MindChat_Appointments;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=BDD_MindChat_Appointments;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
       - Jwt__Key=${JWT_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
     ports:
       - "5002:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     networks:
       - mindchat-network
     restart: unless-stopped
@@ -87,12 +96,15 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Server=host.docker.internal;Database=BDD_MindChat_Chat;User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=BDD_MindChat_Chat;User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true
       - Jwt__Key=${JWT_KEY}
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
     ports:
       - "5003:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     networks:
       - mindchat-network
     restart: unless-stopped

@@ -1,22 +1,33 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, MessageSquare, Calendar, User, LogOut, Settings } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Calendar, User, LogOut, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth.store";
 import { motion } from "framer-motion";
 
-const sidebarItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: MessageSquare, label: "Chat", href: "/chat" },
-  { icon: Calendar, label: "Appointments", href: "/appointments" },
-  { icon: User, label: "Profile", href: "/profile" },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
+
+  // Different sidebar items for patient vs psychologist
+  const sidebarItems = user?.userType === 'psychologist' 
+    ? [
+        { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+        { icon: MessageSquare, label: "Chat", href: "/chat" },
+        { icon: Calendar, label: "Appointments", href: "/appointments" },
+        { icon: Users, label: "My Patients", href: "/patients" },
+        { icon: User, label: "Profile", href: "/profile" },
+      ]
+    : [
+        { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+        { icon: Users, label: "Psychologists", href: "/psychologists" },
+        { icon: MessageSquare, label: "Chat", href: "/chat" },
+        { icon: Calendar, label: "Appointments", href: "/appointments" },
+        { icon: User, label: "Profile", href: "/profile" },
+      ];
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 hidden md:flex flex-col bg-white/5 backdrop-blur-xl border-r border-white/10 z-50">
@@ -33,7 +44,7 @@ export function Sidebar() {
             <Link key={item.href} href={item.href}>
               <div
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300",
+                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative",
                   isActive
                     ? "bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-600 border border-purple-500/10"
                     : "text-muted-foreground hover:bg-white/5 hover:text-foreground"

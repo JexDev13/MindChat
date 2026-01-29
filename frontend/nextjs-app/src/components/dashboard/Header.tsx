@@ -7,6 +7,7 @@ import { useAuthStore } from "@/lib/store/auth.store";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Need to add Sheet component if not present
 import { Sidebar } from "./Sidebar";
 import { useState } from "react";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 
 // Note: I haven't added 'sheet' component from shadcn yet. I should do that or use a simple mobile menu implementation.
 // For now, I'll stick to a simple implementation without Sheet or install it.
@@ -58,10 +59,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        <button className="p-2 hover:bg-white/10 rounded-full relative">
-          <Bell size={20} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-        </button>
+        <NotificationDropdown />
         
         <div className="flex items-center gap-3 pl-4 border-l border-white/10">
           <div className="text-right hidden sm:block">

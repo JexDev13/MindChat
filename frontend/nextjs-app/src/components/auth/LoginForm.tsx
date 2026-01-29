@@ -18,8 +18,10 @@ import { cn } from "@/lib/utils";
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  userType: z.enum(["patient", "psychologist"]).default("patient"),
+  userType: z.enum(["patient", "psychologist"]),
 });
+
+type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +31,7 @@ export function LoginForm() {
 
   const [userType, setUserType] = useState<"patient" | "psychologist">("patient");
 
-  const { register, handleSubmit, formState: { errors } } = useForm<z.infer<typeof loginSchema>>({
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -38,7 +40,7 @@ export function LoginForm() {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+  const onSubmit = async (values: LoginFormData) => {
     setIsLoading(true);
     setErrorMessage(null);
     
@@ -55,7 +57,7 @@ export function LoginForm() {
 
       const data = response.data;
       
-      // API Gateway devuelve: { token, userId, email, fullName, role }
+      // API Gateway devuelve: { token, userId, email, fullName, role, profileId }
       if (data.token) {
         // Store token in localStorage and cookie for middleware
         localStorage.setItem('authToken', data.token);
@@ -69,6 +71,7 @@ export function LoginForm() {
           firstName: nameParts[0], 
           lastName: nameParts.slice(1).join(' ') || '', 
           userType: data.role?.toLowerCase() === 'psychologist' ? 'psychologist' : 'patient',
+          profileId: data.profileId,
           profilePictureUrl: undefined 
         }, data.token);
         

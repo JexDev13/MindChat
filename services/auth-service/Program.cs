@@ -105,6 +105,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Auto-migrate database on startup
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    dbContext.Database.EnsureCreated();
+}
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -213,6 +220,59 @@ app.MapPost("/api/auth/reset-password", async (
 })
 .WithName("ResetPassword")
 .WithTags("Password Recovery")
+.WithOpenApi();
+
+// ====================
+// USER INFO ENDPOINTS
+// ====================
+
+app.MapGet("/api/auth/users/{userId}", async (
+    Guid userId,
+    AuthDbContext dbContext) =>
+{
+    var user = await dbContext.Users.FindAsync(userId);
+    if (user == null)
+        return Results.NotFound(new { message = "User not found" });
+    
+    return Results.Ok(new 
+    {
+        userId = user.Id,
+        fullName = user.FullName,
+        email = user.Email,
+        profilePictureUrl = user.ProfilePictureUrl
+    });
+})
+.RequireAuthorization()
+.WithName("GetUserById")
+.WithTags("User Info")
+.WithOpenApi();
+
+app.MapGet("/api/auth/users/batch", async (
+    string userIds,
+    AuthDbContext dbContext) =>
+{
+    var ids = userIds.Split(',')
+        .Select(id => Guid.TryParse(id.Trim(), out var guid) ? guid : (Guid?)null)
+        .Where(id => id.HasValue)
+        .Select(id => id!.Value)
+        .ToList();
+    
+    var users = await dbContext.Users
+        .Where(u => ids.Contains(u.Id))
+        .Select(u => new 
+        {
+            userId = u.Id,
+            fullName = u.FullName,
+            email = u.Email,
+            profilePictureUrl = u.ProfilePictureUrl
+        })
+        .ToListAsync();
+    
+    return Results.Ok(users);
+})
+.RequireAuthorization()
+.WithName("GetUsersByIds")
+.WithTags("User Info")
 .WithOpenApi();
 
 app.Run();

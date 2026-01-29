@@ -7,6 +7,7 @@ export interface User {
   firstName: string;
   lastName: string;
   userType: 'patient' | 'psychologist';
+  profileId?: string;
   profilePictureUrl?: string;
 }
 
