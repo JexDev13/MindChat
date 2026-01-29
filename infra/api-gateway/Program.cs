@@ -22,7 +22,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "MindChat",
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "MindChat",
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "MindChatClients",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });

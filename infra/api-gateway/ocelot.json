@@ -25,6 +25,21 @@
       "UpstreamHttpMethod": [ "GET" ]
     },
     {
+      "DownstreamPathTemplate": "/api/patients",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "clinical-service",
+          "Port": 8080
+        }
+      ],
+      "UpstreamPathTemplate": "/api/clinical/patients",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer"
+      }
+    },
+    {
       "DownstreamPathTemplate": "/api/patients/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
@@ -35,6 +50,21 @@
       ],
       "UpstreamPathTemplate": "/api/clinical/patients/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer"
+      }
+    },
+    {
+      "DownstreamPathTemplate": "/api/psychologists",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "clinical-service",
+          "Port": 8080
+        }
+      ],
+      "UpstreamPathTemplate": "/api/clinical/psychologists",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer"
       }
