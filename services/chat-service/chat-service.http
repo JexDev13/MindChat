@@ -1,0 +1,220 @@
+### MindChat - Chat Service API Tests
+@baseUrl = http://localhost:5003
+@gatewayUrl = http://localhost:8080
+@token = YOUR_JWT_TOKEN_HERE
+
+### Health Check
+GET {{baseUrl}}/health
+
+###
+### SIGNALR - MENSAJERÍA EN TIEMPO REAL
+###
+### Conectar a SignalR Hub (usar cliente SignalR, no HTTP directo)
+# JavaScript/TypeScript:
+# import * as signalR from "@microsoft/signalr";
+#
+# const connection = new signalR.HubConnectionBuilder()
+#   .withUrl("http://localhost:5003/chatHub", {
+#     accessTokenFactory: () => "{{token}}"
+#   })
+#   .withAutomaticReconnect()
+#   .build();
+#
+# await connection.start();
+# console.log("Conectado a SignalR");
+#
+# // Unirse a un chat
+# await connection.invoke("JoinChat", chatId);
+#
+# // Enviar mensaje
+# await connection.invoke("SendMessage", chatId, "Hola");
+#
+# // Indicar que está escribiendo
+# await connection.invoke("Typing", chatId);
+# await connection.invoke("StopTyping", chatId);
+#
+# // Recibir mensajes
+# connection.on("ReceiveMessage", (chatId, userId, message, sentAt) => {
+#   console.log("Nuevo mensaje:", message);
+# });
+#
+# connection.on("UserTyping", (chatId, userId, userName) => {
+#   console.log(userName + " está escribiendo...");
+# });
+
+###
+### SESSION REQUESTS ENDPOINTS
+###
+
+### Get All Session Requests
+GET {{baseUrl}}/api/session-requests
+Authorization: Bearer {{token}}
+
+### Get Pending Session Requests
+GET {{baseUrl}}/api/session-requests/pending
+Authorization: Bearer {{token}}
+
+### Get Session Request by ID
+@sessionRequestId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/session-requests/{{sessionRequestId}}
+Authorization: Bearer {{token}}
+
+### Get Session Requests by Patient
+@patientId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/session-requests/patient/{{patientId}}
+Authorization: Bearer {{token}}
+
+### Get Session Requests by Psychologist
+@psychologistId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/session-requests/psychologist/{{psychologistId}}
+Authorization: Bearer {{token}}
+
+### Create Session Request
+POST {{baseUrl}}/api/session-requests
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "patientId": "00000000-0000-0000-0000-000000000000",
+  "initialMessage": "Necesito ayuda con ansiedad y estrés laboral"
+}
+
+### Assign Psychologist to Session Request
+@assignSessionRequestId = 00000000-0000-0000-0000-000000000000
+PUT {{baseUrl}}/api/session-requests/{{assignSessionRequestId}}/assign-psychologist
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "psychologistId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Update Session Request Status (Accept)
+@updateSessionRequestId = 00000000-0000-0000-0000-000000000000
+PATCH {{baseUrl}}/api/session-requests/{{updateSessionRequestId}}/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "Accepted"
+}
+
+### Update Session Request Status (Reject)
+PATCH {{baseUrl}}/api/session-requests/{{updateSessionRequestId}}/status
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "Rejected"
+}
+
+### Delete Session Request
+@deleteSessionRequestId = 00000000-0000-0000-0000-000000000000
+DELETE {{baseUrl}}/api/session-requests/{{deleteSessionRequestId}}
+Authorization: Bearer {{token}}
+
+###
+### CHATS ENDPOINTS
+###
+
+### Get Chat by ID
+@chatId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/chats/{{chatId}}
+Authorization: Bearer {{token}}
+
+### Get Chat with Messages
+GET {{baseUrl}}/api/chats/{{chatId}}/with-messages
+Authorization: Bearer {{token}}
+
+### Get Chat by Session Request ID
+@chatSessionRequestId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/chats/session-request/{{chatSessionRequestId}}
+Authorization: Bearer {{token}}
+
+### Create Chat
+POST {{baseUrl}}/api/chats
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sessionRequestId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Close Chat
+@closeChatId = 00000000-0000-0000-0000-000000000000
+PATCH {{baseUrl}}/api/chats/{{closeChatId}}/close
+Authorization: Bearer {{token}}
+
+### Delete Chat
+@deleteChatId = 00000000-0000-0000-0000-000000000000
+DELETE {{baseUrl}}/api/chats/{{deleteChatId}}
+Authorization: Bearer {{token}}
+
+###
+### MESSAGES ENDPOINTS
+###
+
+### Get Chat Messages
+@messageChatId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/api/messages/chat/{{messageChatId}}
+Authorization: Bearer {{token}}
+
+### Send Message
+POST {{baseUrl}}/api/messages
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "chatId": "00000000-0000-0000-0000-000000000000",
+  "senderUserId": "00000000-0000-0000-0000-000000000000",
+  "message": "Hola, necesito ayuda con mi ansiedad"
+}
+
+### Send Another Message
+POST {{baseUrl}}/api/messages
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "chatId": "00000000-0000-0000-0000-000000000000",
+  "senderUserId": "00000000-0000-0000-0000-000000000000",
+  "message": "¿Podrías darme algunos consejos?"
+}
+
+### Delete Message
+@deleteMessageId = 00000000-0000-0000-0000-000000000000
+DELETE {{baseUrl}}/api/messages/{{deleteMessageId}}
+Authorization: Bearer {{token}}
+
+###
+### VIA API GATEWAY
+###
+
+### Get All Session Requests via Gateway
+GET {{gatewayUrl}}/api/session-requests
+Authorization: Bearer {{token}}
+
+### Create Session Request via Gateway
+POST {{gatewayUrl}}/api/session-requests
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "patientId": "00000000-0000-0000-0000-000000000000",
+  "initialMessage": "Solicitud vía API Gateway"
+}
+
+### Send Message via Gateway
+POST {{gatewayUrl}}/api/messages
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "chatId": "00000000-0000-0000-0000-000000000000",
+  "senderUserId": "00000000-0000-0000-0000-000000000000",
+  "message": "Mensaje enviado vía API Gateway"
+}
+
+### Health Check via Gateway
+GET {{gatewayUrl}}/chat/health
+
