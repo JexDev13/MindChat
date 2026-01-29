@@ -14,6 +14,8 @@ import { Input } from "../ui/input";
 import { AlertCircle, Loader2 } from "lucide-react";
 import apiClient from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { patientsApi } from "@/lib/api/patients.api";
+import { psychologistsApi } from "@/lib/api/psychologists.api";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email format"),
@@ -63,15 +65,42 @@ export function LoginForm() {
         localStorage.setItem('authToken', data.token);
         document.cookie = `authToken=${data.token}; path=/; max-age=86400`;
         
+        let profileId = data.profileId;
+        let profileData: any = {};
+
+        // Fetch profile to get profileId if missing or to ensure we have it
+        try {
+            if (data.role === 'Patient' || userType === 'patient') {
+                const profileRes = await patientsApi.getByUserId(data.userId);
+                profileId = profileRes.data.profileId;
+                profileData = profileRes.data;
+            } else if (data.role === 'Psychologist' || userType === 'psychologist') {
+                const profileRes = await psychologistsApi.getByUserId(data.userId);
+                profileId = profileRes.data.profileId;
+                profileData = profileRes.data;
+            }
+        } catch (err) {
+            console.error("Failed to fetch profile", err);
+        }
+
         // Parse user data from response
         const nameParts = data.fullName?.split(' ') || ['User'];
+
+        // Use backend role if available, otherwise userType from form
+        const finalRole = (data.role?.toLowerCase() === 'psychologist' || userType === 'psychologist')
+            ? 'Psychologist'
+            : 'Patient';
+
         login({ 
-          id: data.userId, 
+          userId: data.userId,
+          profileId: profileId,
           email: data.email, 
-          firstName: nameParts[0], 
-          lastName: nameParts.slice(1).join(' ') || '', 
-          userType: data.role?.toLowerCase() === 'psychologist' ? 'psychologist' : 'patient',
-          profileId: data.profileId,
+          role: finalRole,
+          firstName: profileData.firstName || nameParts[0],
+          lastName: profileData.lastName || nameParts.slice(1).join(' ') || '',
+          // Legacy mapping
+          id: data.userId,
+          userType: finalRole === 'Psychologist' ? 'psychologist' : 'patient',
           profilePictureUrl: undefined 
         }, data.token);
         

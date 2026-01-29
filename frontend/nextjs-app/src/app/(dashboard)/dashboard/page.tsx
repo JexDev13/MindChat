@@ -1,24 +1,24 @@
 "use client";
 
 import { useAuthStore } from "@/lib/store/auth.store";
-import { PatientWidgets } from "@/components/dashboard/PatientWidgets";
-import { PsychologistWidgets } from "@/components/dashboard/PsychologistWidgets";
 import { useEffect, useState } from "react";
+import { PsychologistBrowser } from "@/components/patient/PsychologistBrowser";
+import { PendingRequests } from "@/components/psychologist/PendingRequests";
+import { AppointmentsList } from "@/components/appointments/AppointmentsList";
+import { PsychologistDebug } from "@/components/debug/PsychologistDebug";
 
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => setMounted(true), 0);
+    setMounted(true);
   }, []);
 
   if (!mounted) return null;
 
-  // Fallback for dev/demo if user state is empty but token exists (or middleware skipped)
-  // In a real app, we fetch user profile on load if store is empty.
-  // For now, if no user, I show patient view as default demo
-  const userType = user?.userType || 'patient';
+  // Normalize role
+  const isPsychologist = user?.role === 'Psychologist' || user?.userType === 'psychologist';
   const firstName = user?.firstName || 'Guest';
 
   return (
@@ -31,11 +31,23 @@ export default function DashboardPage() {
           Here&apos;s your daily overview.
         </p>
       </div>
+
+      {/* Debug Component - Helping to diagnose issues */}
+      {/* <PsychologistDebug /> */}
       
-      {userType === 'psychologist' ? (
-        <PsychologistWidgets />
+      {isPsychologist ? (
+        <div className="space-y-8">
+            <PendingRequests />
+            <AppointmentsList />
+        </div>
       ) : (
-        <PatientWidgets />
+        <div className="space-y-8">
+            <AppointmentsList />
+            <div>
+                <h2 className="text-xl font-bold mb-4">Find a Psychologist</h2>
+                <PsychologistBrowser />
+            </div>
+        </div>
       )}
     </div>
   );

@@ -2,13 +2,18 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export interface User {
-  id: string;
+  userId: string;      // From JWT token
+  profileId?: string;   // From Clinical Service
   email: string;
-  firstName: string;
-  lastName: string;
-  userType: 'patient' | 'psychologist';
-  profileId?: string;
+  role: 'Patient' | 'Psychologist';
+  name?: string;
+  firstName?: string;
+  lastName?: string;
   profilePictureUrl?: string;
+
+  // Legacy support
+  id?: string;
+  userType?: 'patient' | 'psychologist';
 }
 
 interface AuthState {
